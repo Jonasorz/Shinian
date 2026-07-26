@@ -1,0 +1,28 @@
+.DS_Store
+
+# Environment and credentials
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Dependencies and build output
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# Runtime data must be backed up separately from source code
+data/
+uploads/
+backups/
+*.sqlite
+*.sqlite3
+
+# Temporary and local files
+tmp/
+*.log
+*.swp
+
