@@ -1,0 +1,35 @@
+{
+  "name": "shinian",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "node --env-file=.env scripts/migrate.mjs",
+    "auth:hash": "node scripts/hash-password.mjs",
+    "setup:local": "node scripts/setup-local.mjs"
+  },
+  "dependencies": {
+    "bcryptjs": "3.0.3",
+    "jose": "6.2.4",
+    "lucide-react": "1.27.0",
+    "next": "16.2.12",
+    "postgres": "3.4.9",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "eslint": "10.8.0",
+    "eslint-config-next": "16.2.12",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

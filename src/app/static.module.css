@@ -1,0 +1,65 @@
+.page {
+  display: flex;
+  min-height: 100vh;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 14vh 24px 64px;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.mark {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 42px;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--accent);
+  color: var(--surface);
+  font-family: var(--font-reading);
+  font-size: 28px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.page h1 {
+  margin: 0;
+  font-family: var(--font-reading);
+  font-size: clamp(32px, 7vw, 48px);
+  font-weight: 600;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.page p:not(.eyebrow) {
+  max-width: 36rem;
+  margin: 22px 0 30px;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.75;
+  text-wrap: pretty;
+}
+
+.page a {
+  min-height: 40px;
+  padding: 10px 15px;
+  border-radius: var(--radius-control);
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition-property: transform, background-color;
+  transition-duration: 160ms;
+}
+
+.page a:active {
+  transform: scale(0.96);
+}
+

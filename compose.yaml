@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: shinian
+      POSTGRES_USER: shinian
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - shinian_postgres:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shinian -d shinian"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://shinian:${POSTGRES_PASSWORD}@db:5432/shinian
+      SHINIAN_USERNAME: ${SHINIAN_USERNAME}
+      SHINIAN_PASSWORD_HASH: ${SHINIAN_PASSWORD_HASH}
+      AUTH_SECRET: ${AUTH_SECRET}
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  shinian_postgres:

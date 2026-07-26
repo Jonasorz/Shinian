@@ -1,0 +1,45 @@
+import type { Metadata, Viewport } from "next";
+import type { ReactNode } from "react";
+import { PwaRegister } from "@/components/PwaRegister";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: {
+    default: "Shinian",
+    template: "%s · Shinian",
+  },
+  description: "自托管的卡片笔记与轻量任务系统",
+  applicationName: "Shinian",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Shinian",
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon-192.png",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f4f0e7",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{ children: ReactNode }>) {
+  return (
+    <html lang="zh-CN">
+      <body>
+        <a className="skip-link" href="#main-content">
+          跳到主要内容
+        </a>
+        {children}
+        <PwaRegister />
+      </body>
+    </html>
+  );
+}
