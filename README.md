@@ -40,7 +40,7 @@ npm run dev
 
 如果本机 Docker 不支持 `docker compose` 子命令，可将上面的命令替换为 `docker-compose`。
 
-浏览器打开 `http://localhost:3000`，用户名为初始化时设置的 `owner`，密码为同一条命令中的密码。
+浏览器打开 `http://localhost:3210`，用户名为初始化时设置的 `owner`，密码为同一条命令中的密码。
 
 常用检查：
 
@@ -56,7 +56,7 @@ npm run build
 2. 克隆私有仓库。
 3. 运行 `npm run setup:local -- <用户名> "<强密码>"` 创建 `.env`。
 4. 运行 `docker compose up -d --build`。
-5. 用 Caddy 或 Nginx 将域名反向代理到 `127.0.0.1:3000`，并启用 HTTPS。
+5. 用 Caddy 或 Nginx 将域名反向代理到 `127.0.0.1:3210`，并启用 HTTPS。
 
 生产环境不要复用本地 `.env`。`.env`、数据库卷和备份文件均不会提交到 Git。
 

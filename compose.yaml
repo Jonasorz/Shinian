@@ -28,7 +28,7 @@ services:
       SHINIAN_PASSWORD_HASH_B64: ${SHINIAN_PASSWORD_HASH_B64}
       AUTH_SECRET: ${AUTH_SECRET}
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${SHINIAN_PORT:-3210}:3000"
 
 volumes:
   shinian_postgres:
