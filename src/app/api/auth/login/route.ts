@@ -20,6 +20,19 @@ function clientKey(request: NextRequest): string {
   );
 }
 
+function configuredPasswordHash(): string | null {
+  const encodedHash = process.env.SHINIAN_PASSWORD_HASH_B64;
+  if (encodedHash) {
+    try {
+      return Buffer.from(encodedHash, "base64").toString("utf8");
+    } catch {
+      return null;
+    }
+  }
+
+  return process.env.SHINIAN_PASSWORD_HASH ?? null;
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const originError = authorizeMutationOrigin(request);
   if (originError) {
@@ -45,7 +58,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const expectedUsername = process.env.SHINIAN_USERNAME;
-  const passwordHash = process.env.SHINIAN_PASSWORD_HASH;
+  const passwordHash = configuredPasswordHash();
   if (!expectedUsername || !passwordHash) {
     return apiError("管理员账号尚未配置", 503);
   }
@@ -67,4 +80,3 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   );
   return response;
 }
-
