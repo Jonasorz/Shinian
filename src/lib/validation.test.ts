@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   createMemoSchema,
+  createTaskSchema,
   loginSchema,
   updateMemoSchema,
+  updateTaskSchema,
 } from "./validation";
 
 describe("memo validation", () => {
@@ -25,6 +27,29 @@ describe("login validation", () => {
     expect(loginSchema.safeParse({ username: "", password: "" }).success).toBe(
       false,
     );
+  });
+});
+
+describe("task validation", () => {
+  it("validates and applies defaults for task creation", () => {
+    const result = createTaskSchema.parse({ title: "  完成 MVP 开发  " });
+    expect(result.title).toBe("完成 MVP 开发");
+    expect(result.listName).toBe("收件箱");
+    expect(result.priority).toBe("none");
+    expect(result.recurrenceRule).toBe("none");
+  });
+
+  it("rejects empty task title", () => {
+    expect(createTaskSchema.safeParse({ title: "   " }).success).toBe(false);
+  });
+
+  it("validates task update fields", () => {
+    const result = updateTaskSchema.parse({
+      status: "done",
+      priority: "high",
+    });
+    expect(result.status).toBe("done");
+    expect(result.priority).toBe("high");
   });
 });
 

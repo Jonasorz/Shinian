@@ -11,10 +11,14 @@ import {
 import { useRouter } from "next/navigation";
 import {
   Check,
+  CheckSquare,
   Feather,
   LogOut,
   PencilLine,
+  Search,
   Send,
+  Settings,
+  Sparkles,
   Trash2,
   Undo2,
   X,
@@ -88,9 +92,13 @@ function MemoContent({ content }: { content: string }) {
     <>
       {segments.map((segment, index) =>
         segment.startsWith("#") ? (
-          <span className={styles.inlineTag} key={`${segment}-${index}`}>
+          <a
+            key={`${segment}-${index}`}
+            className={styles.inlineTag}
+            href={`/search?tag=${encodeURIComponent(segment)}`}
+          >
             {segment}
-          </span>
+          </a>
         ) : (
           segment
         ),
@@ -319,6 +327,30 @@ export function MemoWorkspace({
     }
   }
 
+  async function convertMemoToTask(memo: Memo) {
+    const lines = memo.content.trim().split("\n");
+    const title = lines[0]?.trim() ?? "无标题任务";
+    const description = lines.slice(1).join("\n").trim();
+
+    setBusyMemoId(memo.id);
+    try {
+      await apiRequest("/api/tasks", {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          description,
+          sourceMemoId: memo.id,
+        }),
+      });
+      setNotice("已成功转为关联任务！");
+      window.setTimeout(() => setNotice(""), 1800);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "无法转为任务");
+    } finally {
+      setBusyMemoId(null);
+    }
+  }
+
   async function logout() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -343,6 +375,22 @@ export function MemoWorkspace({
             <span className={styles.activeDot} aria-hidden="true" />
             <Feather aria-hidden="true" size={17} strokeWidth={1.7} />
             记录
+          </a>
+          <a href="/tasks">
+            <CheckSquare aria-hidden="true" size={17} strokeWidth={1.7} />
+            任务
+          </a>
+          <a href="/search">
+            <Search aria-hidden="true" size={17} strokeWidth={1.7} />
+            搜索
+          </a>
+          <a href="/review">
+            <Sparkles aria-hidden="true" size={17} strokeWidth={1.7} />
+            回顾
+          </a>
+          <a href="/settings">
+            <Settings aria-hidden="true" size={17} strokeWidth={1.7} />
+            设置
           </a>
         </nav>
 
@@ -547,6 +595,19 @@ export function MemoWorkspace({
                                   </div>
                                 ) : (
                                   <div className={styles.memoActions}>
+                                    <button
+                                      aria-label="转为关联任务"
+                                      disabled={busyMemoId === memo.id}
+                                      onClick={() => void convertMemoToTask(memo)}
+                                      type="button"
+                                    >
+                                      <CheckSquare
+                                        aria-hidden="true"
+                                        size={16}
+                                        strokeWidth={1.7}
+                                      />
+                                      <span>转为任务</span>
+                                    </button>
                                     <button
                                       aria-label="编辑这条记录"
                                       onClick={() => startEditing(memo)}

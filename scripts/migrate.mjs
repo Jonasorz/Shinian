@@ -21,7 +21,7 @@ try {
   `;
 
   const migrationsDirectory = path.join(process.cwd(), "db", "migrations");
-  const filenames = ["001_init.sql"];
+  const filenames = ["001_init.sql", "002_tasks.sql", "003_import_batches.sql"];
 
   for (const filename of filenames) {
     const [existing] = await sql`
