@@ -1,77 +1,111 @@
-# Shinian
+# Shinian (拾年)
 
-Shinian 是一个部署在个人 VPS 上的自托管卡片笔记与轻量任务系统。第一阶段先把记录做顺手：打开即写、时间线整理、随时编辑，并把数据掌握在自己手里。
+Shinian 是一个部署在个人 VPS 上的自托管卡片笔记与轻量任务系统。打造“打开即写、时间线整理、随心管理待办、数据完全自主掌控”的个人知识与任务随手记工具。
 
 ## 当前版本
 
-MVP v0.1 已实现：
+MVP Phase 1 已完成功能：
 
-- 单用户登录与 7 天安全会话
-- 无标题快速记录，支持 `Command/Ctrl + Enter` 保存
-- 按日期分组的卡片时间线
-- 卡片编辑、二次确认删除、8 秒撤销
-- `#标签` 自动高亮
-- 未提交内容保存在当前浏览器
-- 可安装 PWA，提供离线提示页
-- PostgreSQL 持久化、Docker 容器和 VPS 部署基础
-- 桌面端与手机端响应式界面
+- **卡片笔记 (Notes)**：无标题快速记录、时间线按日分组、卡片编辑/二次确认删除与 8 秒撤销、`#标签` 自动高亮与提取、草稿本地自动暂存。
+- **任务管理 (Tasks)**：收件箱 / 今天 / 近期 / 清单多视图、优先级设置、起止日期、提醒时间、循环重复规则、卡片一键转任务。
+- **全局搜索 (Search)**：支持卡片内容与任务标题/描述的全文检索，支持 `#标签` 聚合筛选。
+- **每日回顾 (Daily Review)**：浏览历史今日卡片与已完成任务的回顾复盘。
+- **数据导入与导出 (Import & Export)**：支持一键导出为 Obsidian Markdown (.zip) 格式；支持导入 flomo (HTML/ZIP) 卡片与滴答清单 (CSV) 任务。
+- **系统与安全**：单用户登录与 7 天安全 Session、PWA 离线提示、PostgreSQL 持久化、桌面/移动端响应式界面。
+
+*暂不包含：团队协作、习惯打卡、四象限视图、甘特图、日历订阅、Notion 实时同步。*
 
 产品需求见 [PRD v0.2](output/doc/Shinian_PRD_v0.2.md)，视觉规范见 [DESIGN.md](DESIGN.md)。
 
-暂不包含团队协作、习惯打卡、四象限、甘特图、日历订阅、Notion 同步和 Obsidian 双向同步。轻量任务、提醒、回顾、Markdown 导出及手机原生分享收件箱将在后续版本开发。
+## 使用说明
 
-## 本地启动
+### 1. 快捷记录卡片 (Notes)
+- **快速提交**：在主页输入框直接输入想法、随笔或 Markdown 内容，快捷键 `Command + Enter` (Mac) 或 `Ctrl + Enter` (Windows) 快速提交保存。
+- **草稿防丢失**：输入框中未提交的内容会自动暂存在浏览器本地，意外刷新或关闭页面不会丢失。
+- **标签归类**：输入框内编写 `#标签名`（如 `#灵感` `#工作`），发送后系统会自动识别高亮，点击标签可快速筛选。
+- **卡片管理**：悬停卡片可进行编辑或删除。删除卡片支持 **8 秒内一键撤销**。
+- **卡片转任务**：在卡片操作菜单中选择“转为任务”，可将卡片内容直接转换为待办事项。
+
+### 2. 轻量任务管理 (Tasks)
+- **视图切换**：在任务页面侧边/顶部切换“收件箱”、“今天”、“近期”或自定义“清单”。
+- **任务属性**：新建或编辑任务时，可指定优先级（低/中/高/紧急）、起始日期、截止日期、提醒时间以及循环重复规则（每天/每周/每月/每年等）。
+- **状态管理**：点击复选框标记完成/恢复任务，轻松掌握待办进度。
+
+### 3. 全局搜索与标签 (Search)
+- **全文检索**：在搜索页面实时匹配卡片正文、任务标题与详细描述。
+- **热门标签云**：聚合展示所有已使用的 `#标签`，点击即可过滤出关联的卡片与任务。
+
+### 4. 每日回顾 (Review)
+- 在“回顾”页面，系统会自动呈现历史同日记录的卡片笔记以及近期已完成的任务，方便定期温故知新与个人复盘。
+
+### 5. 数据导入与导出 (Import & Export)
+- **导出至 Obsidian**：进入“设置 -> 数据导出”，点击“导出为 Obsidian Markdown”。下载的 `.zip` 压缩包解压后可直接用作 Obsidian 知识库，每篇 Markdown 均附带 YAML Frontmatter 元数据。
+- **flomo 数据导入**：在设置页面上传 flomo 导出的 `HTML` 文件或 `.zip` 压缩包，自动解析卡片内容与 `#标签` 并批量导入。
+- **滴答清单 (TickTick) 导入**：在设置页面上传滴答清单导出的 `CSV` 文件，自动解析任务标题、描述、优先级与完成状态并批量导入。
+
+### 6. PWA 离线体验
+- 支持在 Chrome / Safari 等浏览器中选择“添加到主屏幕”或“安装应用”，提供原生 App 体验及网络离线状态提示。
+
+## 本地启动与调试
 
 要求：
-
 - Node.js 22 或更高版本
 - npm
-- Docker 或 OrbStack
+- Docker / OrbStack 或 本机 PostgreSQL 服务
 
-首次初始化：
-
+### 1. 首次环境初始化
 ```bash
 npm install
 npm run setup:local -- owner "请换成至少12位的本地密码"
-docker compose up -d db
-npm run db:migrate
-npm run dev
 ```
 
-如果本机 Docker 不支持 `docker compose` 子命令，可将上面的命令替换为 `docker-compose`。
-
-浏览器打开 `http://localhost:3210`，用户名为初始化时设置的 `owner`，密码为同一条命令中的密码。
-
-常用检查：
-
+### 2. 数据库准备与迁移
+若使用 Docker 启动数据库：
 ```bash
-npm run lint
-npm test
-npm run build
+docker compose up -d db
+```
+若使用本机已有 PostgreSQL 服务，请确保 `.env` 中的 `DATABASE_URL` 配置正确。
+
+随后运行数据库迁移：
+```bash
+npm run db:migrate
+```
+
+### 3. 启动开发服务
+```bash
+npm run dev
+```
+在浏览器中打开 `http://localhost:3210`，使用账号 `owner` 及刚才配置的密码登录。
+
+### 常用检查命令
+```bash
+npm run lint    # 代码规范检查
+npm test        # 单元测试 (Vitest)
+npm run build   # 构建测试
 ```
 
 ## VPS 部署
 
 1. 在 VPS 安装 Docker、Compose 和 Git。
 2. 克隆私有仓库。
-3. 运行 `npm run setup:local -- <用户名> "<强密码>"` 创建 `.env`。
-4. 运行 `docker compose up -d --build`。
-5. 用 Caddy 或 Nginx 将域名反向代理到 `127.0.0.1:3210`，并启用 HTTPS。
+3. 运行 `npm run setup:local -- <用户名> "<强密码>"` 生成生产环境 `.env`。
+4. 运行 `docker compose up -d --build` 启动容器服务。
+5. 用 Caddy 或 Nginx 将域名反向代理至 `127.0.0.1:3210`，并配置 HTTPS 证书。
 
-生产环境不要复用本地 `.env`。`.env`、数据库卷和备份文件均不会提交到 Git。
+*注：生产环境请勿复用本地 `.env`。`.env`、数据库卷和备份文件均不会提交到 Git。*
 
 ## 数据与备份
 
-GitHub 只备份源代码，不包含 PostgreSQL 中的私人笔记。正式上线时应另行配置：
-
-- 每日执行 `pg_dump`
-- 加密保存数据库备份
-- 定期复制到 VPS 之外的位置
-- 定期演练恢复
+正式上线部署时建议配置自动备份策略：
+- 每日定时执行 `pg_dump` 导出数据库备份。
+- 备份文件加密保存，并同步至异地（如 VPS 之外的存储服务）。
+- 定期演练数据库恢复流程。
 
 ## 技术栈
 
-- Next.js、React、TypeScript
-- PostgreSQL
-- Docker Compose
-- CSS Modules
+- **框架与语言**：Next.js 16 (App Router)、React 19、TypeScript
+- **设计与样式**：CSS Modules (Vanilla CSS 设计系统)
+- **数据库**：PostgreSQL (postgres.js)
+- **测试框架**：Vitest
+- **部署容器**：Docker Compose
+

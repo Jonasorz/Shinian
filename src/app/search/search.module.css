@@ -1,6 +1,6 @@
 .shell {
   display: grid;
-  min-height: 100vh;
+  min-height: 100dvh;
   grid-template-columns: 228px minmax(0, 1fr);
   background: var(--canvas);
 }
@@ -9,13 +9,14 @@
   position: sticky;
   top: 0;
   display: flex;
-  height: 100vh;
+  height: 100dvh;
   padding:
     max(28px, env(safe-area-inset-top))
     18px
     max(20px, env(safe-area-inset-bottom));
   flex-direction: column;
   background: var(--sidebar);
+  border-right: 1px solid var(--divider);
 }
 
 .brand,
@@ -26,6 +27,7 @@
   font-family: var(--font-reading);
   font-size: 20px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .brand {
@@ -39,13 +41,14 @@
   place-items: center;
   border-radius: 12px;
   background: var(--accent);
-  color: var(--surface);
+  color: #ffffff;
   font-family: var(--font-reading);
   font-size: 21px;
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .nav {
-  margin-top: 48px;
+  margin-top: 40px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -61,18 +64,20 @@
   border-radius: var(--radius-control);
   color: var(--ink-muted);
   font-size: 14px;
+  font-weight: 450;
   text-decoration: none;
-  transition: color 160ms, background-color 160ms, transform 160ms;
+  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .nav a:active {
-  transform: scale(0.96);
+  transform: scale(0.98);
 }
 
 .nav .navActive {
   color: var(--ink);
-  font-weight: 650;
-  background: oklch(0.95 0.01 82);
+  font-weight: 600;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(70, 60, 50, 0.04);
 }
 
 .activeDot {
@@ -82,6 +87,7 @@
   height: 6px;
   border-radius: 999px;
   background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
 }
 
 .sidebarFooter {
@@ -102,7 +108,7 @@
 
 .sidebarFooter span {
   color: var(--ink-muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .sidebarFooter strong {
@@ -122,8 +128,9 @@
   border: none;
   border-radius: var(--radius-small);
   background: transparent;
-  color: var(--ink-soft);
+  color: var(--ink-muted);
   cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
 .sidebarFooter button:hover {
@@ -135,7 +142,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 36px 24px 72px;
+  padding: 40px 24px 72px;
 }
 
 .mobileHeader {
@@ -153,10 +160,11 @@
 
 .eyebrow {
   margin: 0 0 4px;
-  color: var(--ink-muted);
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .pageHeader h1 {
@@ -176,6 +184,12 @@
   border-radius: var(--radius-surface);
   background: var(--surface);
   box-shadow: var(--shadow-composer);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.searchBarCard:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 6px 20px var(--accent-glow);
 }
 
 .searchInput {
@@ -201,9 +215,11 @@
   background: var(--surface-quiet);
   color: var(--ink-muted);
   cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .clearSearchButton:hover {
+  background: var(--divider);
   color: var(--ink);
 }
 
@@ -232,14 +248,14 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 12px;
+  padding: 6px 14px;
   border: 1px solid var(--divider);
   border-radius: 999px;
   background: var(--surface-quiet);
   color: var(--ink-soft);
   font-size: 13px;
   cursor: pointer;
-  transition: all 160ms;
+  transition: all var(--transition-fast);
 }
 
 .tagChip:hover {
@@ -259,11 +275,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 5px;
+  padding: 0 6px;
   border-radius: 999px;
-  background: oklch(0.9 0.015 82);
+  background: var(--divider);
   color: var(--ink-muted);
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Type Filter Tabs */
@@ -276,13 +293,14 @@
 }
 
 .typeTab {
-  padding: 6px 14px;
+  padding: 6px 16px;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
   color: var(--ink-soft);
   font-size: 13px;
   cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .typeTab:hover {
@@ -291,10 +309,10 @@
 
 .activeTypeTab {
   background: var(--surface);
-  border-color: var(--divider);
-  color: var(--ink);
+  border-color: var(--accent);
+  color: var(--accent-strong);
   font-weight: 600;
-  box-shadow: 0 2px 6px oklch(0 0 0 / 0.04);
+  box-shadow: 0 2px 6px var(--accent-glow);
 }
 
 /* Results */
@@ -305,16 +323,16 @@
 }
 
 .resultCard {
-  padding: 16px 20px;
+  padding: 18px 22px;
   border: 1px solid var(--divider);
   border-radius: var(--radius-surface);
   background: var(--surface);
-  transition: border-color 160ms, box-shadow 160ms;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .resultCard:hover {
-  border-color: oklch(0.82 0.02 82);
-  box-shadow: 0 4px 12px oklch(0 0 0 / 0.03);
+  border-color: rgba(200, 109, 81, 0.3);
+  box-shadow: 0 6px 20px rgba(70, 60, 50, 0.04);
 }
 
 .resultHeader {
@@ -328,7 +346,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: var(--radius-small);
   font-size: 11px;
   font-weight: 600;
@@ -340,13 +358,14 @@
 }
 
 .badgeTask {
-  background: oklch(0.93 0.04 220);
-  color: oklch(0.4 0.1 220);
+  background: #E0F2FE;
+  color: #0369A1;
 }
 
 .resultTime {
   color: var(--ink-muted);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .resultTitle {

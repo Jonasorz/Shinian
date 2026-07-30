@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { SidebarTagTree } from "./SidebarTagTree";
 import {
   Calendar,
   Check,
@@ -196,28 +198,30 @@ export function ReviewWorkspace({
         </div>
 
         <nav aria-label="主要导航" className={styles.nav}>
-          <a href="/notes">
+          <Link href="/notes">
             <Feather aria-hidden="true" size={17} strokeWidth={1.7} />
             记录
-          </a>
-          <a href="/tasks">
+          </Link>
+          <Link href="/tasks">
             <CheckSquare aria-hidden="true" size={17} strokeWidth={1.7} />
             任务
-          </a>
-          <a href="/search">
+          </Link>
+          <Link href="/search">
             <Search aria-hidden="true" size={17} strokeWidth={1.7} />
             搜索
-          </a>
-          <a aria-current="page" className={styles.navActive} href="/review">
+          </Link>
+          <Link aria-current="page" className={styles.navActive} href="/review">
             <span className={styles.activeDot} aria-hidden="true" />
             <Sparkles aria-hidden="true" size={17} strokeWidth={1.7} />
             回顾
-          </a>
-          <a href="/settings">
+          </Link>
+          <Link href="/settings">
             <Settings aria-hidden="true" size={17} strokeWidth={1.7} />
             设置
-          </a>
+          </Link>
         </nav>
+
+        <SidebarTagTree />
 
         <div className={styles.sidebarFooter}>
           <div>
@@ -294,9 +298,9 @@ export function ReviewWorkspace({
                       <time>{formatDate(memo.createdAt)}</time>
                       <span>1年前的今天</span>
                     </div>
-                    <p className={styles.memoContent}>
+                    <div className={styles.memoContent}>
                       <MemoContent content={memo.content} />
-                    </p>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -388,9 +392,9 @@ export function ReviewWorkspace({
                         </div>
                       </div>
                     ) : (
-                      <p className={styles.memoContent}>
+                      <div className={styles.memoContent}>
                         <MemoContent content={memo.content} />
-                      </p>
+                      </div>
                     )}
 
                     {!isEditing ? (

@@ -50,7 +50,7 @@ export async function currentUser(): Promise<SessionUser | null> {
 
 export const sessionCookieOptions = {
   httpOnly: true,
-  sameSite: "strict" as const,
+  sameSite: "lax" as const,
   secure: process.env.NODE_ENV === "production",
   path: "/",
   maxAge: SESSION_DURATION_SECONDS,

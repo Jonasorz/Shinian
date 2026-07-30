@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { SidebarTagTree } from "./SidebarTagTree";
 import {
   Check,
   CheckSquare,
@@ -86,24 +88,111 @@ function sortMemos(memos: Memo[]): Memo[] {
   );
 }
 
-function MemoContent({ content }: { content: string }) {
-  const segments = content.split(/(#[\p{L}\p{N}_/-]+)/gu);
+function hasTaskIntent(content: string): boolean {
+  const lower = content.toLowerCase();
   return (
-    <>
-      {segments.map((segment, index) =>
-        segment.startsWith("#") ? (
-          <a
-            key={`${segment}-${index}`}
-            className={styles.inlineTag}
-            href={`/search?tag=${encodeURIComponent(segment)}`}
+    content.includes("#任务") ||
+    content.includes("#待办") ||
+    content.includes("- [ ]") ||
+    content.includes("- [x]") ||
+    lower.startsWith("todo") ||
+    lower.startsWith("待办")
+  );
+}
+
+function extractTaskTitleAndDesc(content: string): {
+  title: string;
+  description: string;
+} {
+  const lines = content.trim().split("\n");
+  const firstLine = lines[0]?.trim() ?? "";
+
+  // Strip leading task checkbox markdown marker (- [ ] or - [x]) if present
+  const cleanedFirstLine = firstLine.replace(/^- \[[ xX]\]\s*/, "").trim();
+
+  const title = cleanedFirstLine || firstLine || "无标题任务";
+  const description = lines.slice(1).join("\n").trim();
+
+  return { title, description };
+}
+
+function MemoContent({ content }: { content: string }) {
+  const lines = content.split("\n");
+  return (
+    <div style={{ whiteSpace: "pre-wrap" }}>
+      {lines.map((line, lineIdx) => {
+        const isUnchecked = line.trim().startsWith("- [ ]");
+        const isChecked =
+          line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]");
+        let lineContent = line;
+
+        if (isUnchecked) {
+          lineContent = line.replace(/^\s*-\s*\[\s*\]\s*/, "");
+        } else if (isChecked) {
+          lineContent = line.replace(/^\s*-\s*\[[xX]\]\s*/, "");
+        }
+
+        const segments = lineContent.split(/(#[\p{L}\p{N}_/-]+)/gu);
+
+        return (
+          <div
+            key={lineIdx}
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              gap: "6px",
+              marginBottom: lineIdx < lines.length - 1 ? "2px" : "0",
+            }}
           >
-            {segment}
-          </a>
-        ) : (
-          segment
-        ),
-      )}
-    </>
+            {isUnchecked ? (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  color: "var(--ink-muted)",
+                  flexShrink: 0,
+                  transform: "translateY(2px)",
+                }}
+              >
+                <CheckSquare size={14} />
+              </span>
+            ) : isChecked ? (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  color: "var(--accent)",
+                  flexShrink: 0,
+                  transform: "translateY(2px)",
+                }}
+              >
+                <Check size={14} strokeWidth={3} />
+              </span>
+            ) : null}
+            <span
+              style={{
+                textDecoration: isChecked ? "line-through" : "none",
+                opacity: isChecked ? 0.65 : 1,
+              }}
+            >
+              {segments.map((segment, index) =>
+                segment.startsWith("#") ? (
+                  <a
+                    key={`${segment}-${index}`}
+                    className={styles.inlineTag}
+                    href={`/search?tag=${encodeURIComponent(segment)}`}
+                  >
+                    {segment}
+                  </a>
+                ) : (
+                  segment
+                ),
+              )}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -215,21 +304,60 @@ export function MemoWorkspace({
       return;
     }
 
+    const isTaskIntent = hasTaskIntent(content);
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMemo: Memo = {
+      id: tempId,
+      content,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      deletedAt: null,
+    };
+
+    // Optimistic UI update: instantly insert to list & clear draft for 0ms lag
+    setMemos((current) => sortMemos([optimisticMemo, ...current]));
+    setDraft("");
+    window.localStorage.removeItem(DRAFT_KEY);
+    setNewMemoId(tempId);
+    window.setTimeout(() => setNewMemoId(null), 700);
+
     setIsCreating(true);
     try {
       const data = await apiRequest<{ memo: Memo }>("/api/memos", {
         method: "POST",
         body: JSON.stringify({ content }),
       });
-      setMemos((current) => sortMemos([data.memo, ...current]));
-      setDraft("");
-      window.localStorage.removeItem(DRAFT_KEY);
-      setNewMemoId(data.memo.id);
-      window.setTimeout(() => setNewMemoId(null), 700);
-      setNotice("已记下");
-      window.setTimeout(() => setNotice(""), 1400);
+
+      // Update optimistic memo with server data
+      setMemos((current) =>
+        sortMemos(current.map((m) => (m.id === tempId ? data.memo : m))),
+      );
+
+      // Auto convert to task if #任务 or - [ ] or todo intent is present
+      if (isTaskIntent) {
+        const { title, description } = extractTaskTitleAndDesc(content);
+        try {
+          await apiRequest("/api/tasks", {
+            method: "POST",
+            body: JSON.stringify({
+              title,
+              description,
+              sourceMemoId: data.memo.id,
+            }),
+          });
+          setNotice("已记下笔记，并已自动同步生成对应任务！");
+        } catch {
+          setNotice("笔记已保存（自动同步任务失败）");
+        }
+      } else {
+        setNotice("已记下");
+      }
+      window.setTimeout(() => setNotice(""), 1800);
       composerRef.current?.focus();
     } catch (error) {
+      // Revert optimistic memo on error
+      setMemos((current) => current.filter((m) => m.id !== tempId));
+      setDraft(content);
       setComposerError(
         error instanceof Error ? error.message : "暂时无法保存",
       );
@@ -328,9 +456,7 @@ export function MemoWorkspace({
   }
 
   async function convertMemoToTask(memo: Memo) {
-    const lines = memo.content.trim().split("\n");
-    const title = lines[0]?.trim() ?? "无标题任务";
-    const description = lines.slice(1).join("\n").trim();
+    const { title, description } = extractTaskTitleAndDesc(memo.content);
 
     setBusyMemoId(memo.id);
     try {
@@ -342,7 +468,7 @@ export function MemoWorkspace({
           sourceMemoId: memo.id,
         }),
       });
-      setNotice("已成功转为关联任务！");
+      setNotice("已成功生成关联任务（原笔记已完整保留）！");
       window.setTimeout(() => setNotice(""), 1800);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "无法转为任务");
@@ -371,28 +497,30 @@ export function MemoWorkspace({
         </div>
 
         <nav aria-label="主要导航" className={styles.nav}>
-          <a aria-current="page" className={styles.navActive} href="/notes">
+          <Link aria-current="page" className={styles.navActive} href="/notes">
             <span className={styles.activeDot} aria-hidden="true" />
             <Feather aria-hidden="true" size={17} strokeWidth={1.7} />
             记录
-          </a>
-          <a href="/tasks">
+          </Link>
+          <Link href="/tasks">
             <CheckSquare aria-hidden="true" size={17} strokeWidth={1.7} />
             任务
-          </a>
-          <a href="/search">
+          </Link>
+          <Link href="/search">
             <Search aria-hidden="true" size={17} strokeWidth={1.7} />
             搜索
-          </a>
-          <a href="/review">
+          </Link>
+          <Link href="/review">
             <Sparkles aria-hidden="true" size={17} strokeWidth={1.7} />
             回顾
-          </a>
-          <a href="/settings">
+          </Link>
+          <Link href="/settings">
             <Settings aria-hidden="true" size={17} strokeWidth={1.7} />
             设置
-          </a>
+          </Link>
         </nav>
+
+        <SidebarTagTree />
 
         <div className={styles.sidebarFooter}>
           <div>
@@ -431,48 +559,68 @@ export function MemoWorkspace({
             </div>
 
             <form className={styles.composer} onSubmit={handleComposerSubmit}>
-              <label className={styles.visuallyHidden} htmlFor="memo-content">
-                记录内容
-              </label>
-              <textarea
-                aria-describedby={
-                  composerError ? "composer-error" : "composer-hint"
-                }
-                autoFocus
-                id="memo-content"
-                maxLength={MAX_CONTENT_LENGTH}
-                onChange={(event) => {
-                  setDraft(event.target.value);
-                  setComposerError("");
-                }}
-                onKeyDown={handleComposerKeyDown}
-                placeholder="无需标题，直接写下这一刻……"
-                ref={composerRef}
-                rows={3}
-                value={draft}
-              />
-              <div className={styles.composerFooter}>
-                <div className={styles.composerMeta}>
-                  {composerError ? (
-                    <span className={styles.errorText} id="composer-error">
-                      {composerError}
-                    </span>
-                  ) : (
-                    <span id="composer-hint">⌘ / Ctrl + Enter 保存</span>
-                  )}
-                  {draft.length > 4500 ? (
-                    <span className={styles.characterCount}>
-                      {draft.length}/{MAX_CONTENT_LENGTH}
-                    </span>
-                  ) : null}
+              <div className={styles.composerInner}>
+                <label className={styles.visuallyHidden} htmlFor="memo-content">
+                  记录内容
+                </label>
+                <textarea
+                  aria-describedby={
+                    composerError ? "composer-error" : "composer-hint"
+                  }
+                  autoFocus
+                  id="memo-content"
+                  maxLength={MAX_CONTENT_LENGTH}
+                  onChange={(event) => {
+                    setDraft(event.target.value);
+                    setComposerError("");
+                  }}
+                  onKeyDown={handleComposerKeyDown}
+                  placeholder="无需标题，直接写下这一刻……"
+                  ref={composerRef}
+                  rows={3}
+                  value={draft}
+                />
+                {hasTaskIntent(draft) ? (
+                  <div
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: "12px",
+                      color: "var(--accent-strong)",
+                      background: "var(--accent-soft)",
+                      borderRadius: "var(--radius-small)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      marginTop: "8px",
+                    }}
+                  >
+                    <Sparkles size={13} />
+                    <span>包含 `#任务` / 待办语法，提交后将自动为您同步生成关联任务（原笔记将保留）</span>
+                  </div>
+                ) : null}
+                <div className={styles.composerFooter}>
+                  <div className={styles.composerMeta}>
+                    {composerError ? (
+                      <span className={styles.errorText} id="composer-error">
+                        {composerError}
+                      </span>
+                    ) : (
+                      <span id="composer-hint">⌘ / Ctrl + Enter 保存</span>
+                    )}
+                    {draft.length > 4500 ? (
+                      <span className={styles.characterCount}>
+                        {draft.length}/{MAX_CONTENT_LENGTH}
+                      </span>
+                    ) : null}
+                  </div>
+                  <button
+                    disabled={isCreating || !draft.trim()}
+                    type="submit"
+                  >
+                    <span>{isCreating ? "保存中" : "记下"}</span>
+                    <Send aria-hidden="true" size={16} strokeWidth={1.8} />
+                  </button>
                 </div>
-                <button
-                  disabled={isCreating || !draft.trim()}
-                  type="submit"
-                >
-                  <span>{isCreating ? "保存中" : "记下"}</span>
-                  <Send aria-hidden="true" size={16} strokeWidth={1.8} />
-                </button>
               </div>
             </form>
           </section>
@@ -569,9 +717,9 @@ export function MemoWorkspace({
                                   </time>
                                   {wasEdited ? <span>已编辑</span> : null}
                                 </div>
-                                <p className={styles.memoContent}>
+                                <div className={styles.memoContent}>
                                   <MemoContent content={memo.content} />
-                                </p>
+                                </div>
 
                                 {isConfirmingDelete ? (
                                   <div className={styles.deleteConfirm}>

@@ -1,28 +1,52 @@
 :root {
-  --canvas: oklch(0.967 0.012 83);
-  --sidebar: oklch(0.938 0.014 81);
-  --surface: oklch(0.992 0.006 84);
-  --surface-quiet: oklch(0.954 0.012 82);
-  --ink: oklch(0.235 0.018 195);
-  --ink-soft: oklch(0.36 0.018 192);
-  --ink-muted: oklch(0.49 0.018 190);
-  --accent: oklch(0.55 0.095 183);
-  --accent-strong: oklch(0.47 0.09 183);
-  --accent-soft: oklch(0.91 0.035 181);
-  --danger: oklch(0.53 0.16 27);
-  --danger-soft: oklch(0.93 0.035 27);
-  --divider: oklch(0.87 0.012 82);
-  --focus: oklch(0.63 0.12 183 / 0.38);
+  /* Warm Sand & Paper Silk (暖沙白绢) Color Palette */
+  --canvas: #FBF9F5;
+  --sidebar: #F4F0E6;
+  --surface: #FFFFFF;
+  --surface-quiet: #EFEAE0;
+  --ink: #1F2023;
+  --ink-soft: #4A4843;
+  --ink-muted: #7E7970;
+  --accent: #C86D51;
+  --accent-strong: #B3583C;
+  --accent-soft: #F9EBE5;
+  --accent-glow: rgba(200, 109, 81, 0.25);
+  --danger: #C2410C;
+  --danger-soft: #FEE2E2;
+  --divider: #E4DEC8;
+  --focus: rgba(200, 109, 81, 0.35);
+
+  /* Doppelrand Double-Bezel Variables */
+  --doppel-shell-bg: rgba(244, 240, 230, 0.85);
+  --doppel-shell-border: 1px solid rgba(200, 109, 81, 0.16);
+  --doppel-shell-radius: 20px;
+  --doppel-core-radius: 14px;
+  --doppel-core-shadow: 0 10px 30px rgba(70, 60, 50, 0.05), 0 2px 6px rgba(70, 60, 50, 0.03);
+
+  /* Elevation Shadows */
   --shadow-composer:
-    0 12px 34px rgb(36 52 49 / 0.08),
-    0 2px 8px rgb(36 52 49 / 0.06);
+    0 12px 34px rgba(70, 60, 50, 0.07),
+    0 2px 8px rgba(70, 60, 50, 0.04);
+  --shadow-floating:
+    0 20px 40px rgba(70, 60, 50, 0.10),
+    0 4px 12px rgba(70, 60, 50, 0.05);
+
+  /* Radii */
   --radius-small: 6px;
   --radius-control: 10px;
   --radius-surface: 16px;
+  --radius-shell: 20px;
+
+  /* Typography */
   --font-ui:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
     "Noto Sans SC", sans-serif;
   --font-reading: "Songti SC", STSong, "Noto Serif SC", serif;
+
+  /* Motion Curves */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-medium: 280ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 * {
@@ -30,23 +54,29 @@
 }
 
 html {
+  min-height: 100dvh;
+  background-color: var(--canvas);
   background: var(--canvas);
   color: var(--ink);
   font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
+  background-color: var(--canvas);
   background: var(--canvas);
+  color: var(--ink);
 }
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -58,15 +88,27 @@ a {
 
 button {
   color: inherit;
+  transition: transform var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+button:active {
+  transform: scale(0.98);
 }
 
 a {
   color: inherit;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
 ::selection {
   background: var(--accent-soft);
-  color: var(--ink);
+  color: var(--accent-strong);
+}
+
+/* Tabular numbers for dates & counts */
+.tabular-nums,
+[data-tabular] {
+  font-variant-numeric: tabular-nums;
 }
 
 .skip-link {
@@ -81,6 +123,7 @@ a {
   opacity: 0;
   pointer-events: none;
   transform: translateY(-8px);
+  transition: opacity 180ms, transform 180ms;
 }
 
 .skip-link:focus {
@@ -104,4 +147,3 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
-

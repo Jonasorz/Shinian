@@ -1,0 +1,125 @@
+.tagSection {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--divider);
+  flex: 1;
+  min-height: 120px;
+  max-height: calc(100vh - 320px);
+  overflow-y: auto;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.headerIcon {
+  color: var(--accent);
+}
+
+.tagTotalBadge {
+  margin-left: auto;
+  font-size: 11px;
+  background: var(--surface-quiet);
+  color: var(--ink-muted);
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.treeContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.nodeWrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.nodeRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  padding-right: 8px;
+  border-radius: var(--radius-small);
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.nodeRow:hover {
+  background: var(--surface-quiet);
+  color: var(--accent-strong);
+}
+
+.nodeActive {
+  background: var(--accent-soft) !important;
+  color: var(--accent-strong) !important;
+  font-weight: 600;
+}
+
+.toggleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  margin: 0;
+  background: transparent;
+  border: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.toggleBtn:hover {
+  background: var(--divider);
+  color: var(--ink);
+}
+
+.togglePlaceholder {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+
+.hashIcon {
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+
+.nodeName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeCount {
+  font-size: 11px;
+  color: var(--ink-muted);
+  background: var(--divider);
+  padding: 1px 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.childrenContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}

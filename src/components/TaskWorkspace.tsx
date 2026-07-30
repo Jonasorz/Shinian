@@ -1,8 +1,11 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { SidebarTagTree } from "./SidebarTagTree";
 import {
+  Bell,
   Calendar,
   Check,
   CheckSquare,
@@ -61,10 +64,19 @@ async function apiRequest<T>(
 
 function formatDateKey(dateStr: string): string {
   const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function toDatetimeLocalVal(isoStr: string | null): string {
+  if (!isoStr) return "";
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function formatDueDateLabel(dueDateStr: string | null): {
@@ -73,6 +85,9 @@ function formatDueDateLabel(dueDateStr: string | null): {
 } {
   if (!dueDateStr) return { label: "", isOverdue: false };
 
+  const d = new Date(dueDateStr);
+  if (isNaN(d.getTime())) return { label: "", isOverdue: false };
+
   const dueKey = formatDateKey(dueDateStr);
   const todayKey = formatDateKey(new Date().toISOString());
 
@@ -80,25 +95,81 @@ function formatDueDateLabel(dueDateStr: string | null): {
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
   const tomorrowKey = formatDateKey(tomorrowDate.toISOString());
 
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
+  const timeStr = hasTime ? ` ${pad(d.getHours())}:${pad(d.getMinutes())}` : "";
+
+  let datePrefix = "";
   if (dueKey === todayKey) {
-    return { label: "今天到期", isOverdue: false };
+    datePrefix = "今天";
+  } else if (dueKey === tomorrowKey) {
+    datePrefix = "明天";
+  } else {
+    datePrefix = new Intl.DateTimeFormat("zh-CN", {
+      month: "numeric",
+      day: "numeric",
+      weekday: "short",
+    }).format(d);
   }
-  if (dueKey === tomorrowKey) {
-    return { label: "明天到期", isOverdue: false };
+
+  const isOverdue = d.getTime() < Date.now();
+  const label = isOverdue
+    ? `已逾期 (${datePrefix}${timeStr})`
+    : `${datePrefix}${timeStr} 到期`;
+
+  return { label, isOverdue };
+}
+
+function formatReminderLabel(reminderStr: string | null): string {
+  if (!reminderStr) return "";
+  const d = new Date(reminderStr);
+  if (isNaN(d.getTime())) return "";
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const todayKey = formatDateKey(reminderStr);
+  const nowTodayKey = formatDateKey(new Date().toISOString());
+  const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  if (todayKey === nowTodayKey) {
+    return `提醒：今天 ${timeStr}`;
   }
+  return `提醒：${d.getMonth() + 1}月${d.getDate()}日 ${timeStr}`;
+}
 
-  const isOverdue = dueKey < todayKey;
+async function triggerMacosNotification(title: string, body: string) {
+  if (typeof window === "undefined" || !("Notification" in window)) return false;
+  if (Notification.permission !== "granted") return false;
 
-  const formatted = new Intl.DateTimeFormat("zh-CN", {
-    month: "numeric",
-    day: "numeric",
-    weekday: "short",
-  }).format(new Date(dueDateStr));
-
-  return {
-    label: isOverdue ? `已逾期 (${formatted})` : formatted,
-    isOverdue,
+  const options: NotificationOptions = {
+    body,
+    icon: "/icon-192.png",
+    tag: `shinian-task-${Date.now()}`,
   };
+
+  // 1. Try Service Worker ready (delivers macOS Notification Center popup)
+  if ("serviceWorker" in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && reg.showNotification) {
+        await reg.showNotification(title, options);
+        return true;
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  // 2. Fallback Web Notification API
+  try {
+    const notif = new Notification(title, options);
+    notif.onclick = () => {
+      window.focus();
+      window.location.href = "/tasks";
+    };
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function TaskWorkspace({
@@ -119,6 +190,7 @@ export function TaskWorkspace({
   const [priority, setPriority] = useState<TaskPriority>("none");
   const [listName, setListName] = useState("收件箱");
   const [dueDate, setDueDate] = useState("");
+  const [reminderAt, setReminderAt] = useState("");
   const [recurrenceRule, setRecurrenceRule] =
     useState<RecurrenceRule>("none");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -131,6 +203,7 @@ export function TaskWorkspace({
   const [editPriority, setEditPriority] = useState<TaskPriority>("none");
   const [editListName, setEditListName] = useState("收件箱");
   const [editDueDate, setEditDueDate] = useState("");
+  const [editReminderAt, setEditReminderAt] = useState("");
   const [editRecurrenceRule, setEditRecurrenceRule] =
     useState<RecurrenceRule>("none");
 
@@ -147,6 +220,64 @@ export function TaskWorkspace({
     taskTitle: string;
     taskId: string;
   } | null>(null);
+
+  const [notificationPermission, setNotificationPermission] = useState<
+    "granted" | "denied" | "default" | "unsupported"
+  >("default");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (typeof window !== "undefined" && "Notification" in window) {
+        setNotificationPermission(Notification.permission);
+      } else if (typeof window !== "undefined") {
+        setNotificationPermission("unsupported");
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  async function requestNotificationPermission() {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    try {
+      const res = await Notification.requestPermission();
+      setNotificationPermission(res);
+      if (res === "granted") {
+        setNotice("🎉 macOS 浏览器系统通知权限已开启！");
+        await triggerMacosNotification(
+          "拾年 - 系统通知已成功开启",
+          "任务到期时，将在 macOS 桌面右上角主动弹窗提醒。",
+        );
+        setTimeout(() => setNotice(""), 2500);
+      } else if (res === "denied") {
+        setNotice("系统通知权限被拒绝，请在 macOS 偏好设置 / 浏览器设置中允许通知");
+      }
+    } catch {
+      setNotice("无法开启通知权限");
+    }
+  }
+
+  useEffect(() => {
+    const notifiedIds = new Set<string>();
+    const timer = setInterval(() => {
+      const now = Date.now();
+      for (const t of tasks) {
+        if (t.status === "done" || t.status === "cancelled") continue;
+        if (!t.reminderAt) continue;
+        const remTime = new Date(t.reminderAt).getTime();
+        if (isNaN(remTime)) continue;
+        if (Math.abs(now - remTime) <= 60000 && !notifiedIds.has(t.id)) {
+          notifiedIds.add(t.id);
+          setNotice(`🔔 提醒到期：${t.title}`);
+          void triggerMacosNotification(
+            "拾年 - 任务提醒",
+            `【${t.title}】到期提醒`,
+          );
+        }
+      }
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, [tasks]);
 
   // Filter tasks based on view & active list
   const filteredTasks = useMemo(() => {
@@ -230,37 +361,74 @@ export function TaskWorkspace({
     return { inbox, today, next7, completed, all: tasks.length };
   }, [tasks]);
 
-  async function handleCreateTask(e: FormEvent) {
-    e.preventDefault();
-    if (!title.trim() || isSubmitting) return;
+  async function handleCreateTask(e?: FormEvent) {
+    if (e) e.preventDefault();
+    const taskTitle = title.trim();
+    if (!taskTitle) return;
+
+    const taskDesc = description.trim();
+    const taskPriority = priority;
+    const taskList = listName || "收件箱";
+    const taskDueDate = dueDate ? new Date(dueDate).toISOString() : null;
+    const taskReminderAt = reminderAt
+      ? new Date(reminderAt).toISOString()
+      : null;
+    const taskRecurrence = recurrenceRule;
+
+    const tempId = `temp-${Date.now()}`;
+    const optimisticTask: Task = {
+      id: tempId,
+      title: taskTitle,
+      description: taskDesc,
+      status: "todo",
+      priority: taskPriority,
+      listName: taskList,
+      startDate: null,
+      dueDate: taskDueDate,
+      reminderAt: taskReminderAt,
+      recurrenceRule: taskRecurrence,
+      completedAt: null,
+      sourceMemoId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      deletedAt: null,
+    };
+
+    // Optimistic UI Update: immediately insert to list and clear inputs for 0ms latency
+    setTasks((prev) => [optimisticTask, ...prev]);
+    if (!lists.includes(taskList)) {
+      setLists((prev) => Array.from(new Set([...prev, taskList])));
+    }
+    setTitle("");
+    setDescription("");
+    setDueDate("");
+    setReminderAt("");
 
     setIsSubmitting(true);
-    setNotice("");
-
     try {
       const data = await apiRequest<{ task: Task }>("/api/tasks", {
         method: "POST",
         body: JSON.stringify({
-          title,
-          description: description || undefined,
-          priority,
-          listName: listName || "收件箱",
-          dueDate: dueDate ? new Date(dueDate).toISOString() : null,
-          recurrenceRule,
+          title: taskTitle,
+          description: taskDesc || undefined,
+          priority: taskPriority,
+          listName: taskList,
+          dueDate: taskDueDate,
+          reminderAt: taskReminderAt,
+          recurrenceRule: taskRecurrence,
         }),
       });
 
-      setTasks((prev) => [data.task, ...prev]);
-      if (!lists.includes(data.task.listName)) {
-        setLists((prev) => Array.from(new Set([...prev, data.task.listName])));
-      }
-
-      setTitle("");
-      setDescription("");
-      setDueDate("");
+      setTasks((prev) =>
+        prev.map((t) => (t.id === tempId ? data.task : t)),
+      );
       setNotice("任务已添加");
       setTimeout(() => setNotice(""), 1600);
     } catch (err) {
+      // Revert optimistic task on error
+      setTasks((prev) => prev.filter((t) => t.id !== tempId));
+      setTitle(taskTitle);
+      setDescription(taskDesc);
       setNotice(err instanceof Error ? err.message : "创建任务失败");
     } finally {
       setIsSubmitting(false);
@@ -314,7 +482,8 @@ export function TaskWorkspace({
     setEditDescription(task.description);
     setEditPriority(task.priority);
     setEditListName(task.listName);
-    setEditDueDate(task.dueDate ? task.dueDate.split("T")[0]! : "");
+    setEditDueDate(toDatetimeLocalVal(task.dueDate));
+    setEditReminderAt(toDatetimeLocalVal(task.reminderAt));
     setEditRecurrenceRule(task.recurrenceRule);
   }
 
@@ -331,6 +500,9 @@ export function TaskWorkspace({
           priority: editPriority,
           listName: editListName,
           dueDate: editDueDate ? new Date(editDueDate).toISOString() : null,
+          reminderAt: editReminderAt
+            ? new Date(editReminderAt).toISOString()
+            : null,
           recurrenceRule: editRecurrenceRule,
         }),
       });
@@ -407,28 +579,30 @@ export function TaskWorkspace({
         </div>
 
         <nav aria-label="主要导航" className={styles.nav}>
-          <a href="/notes">
+          <Link href="/notes">
             <Feather aria-hidden="true" size={17} strokeWidth={1.7} />
             记录
-          </a>
-          <a aria-current="page" className={styles.navActive} href="/tasks">
+          </Link>
+          <Link aria-current="page" className={styles.navActive} href="/tasks">
             <span className={styles.activeDot} aria-hidden="true" />
             <CheckSquare aria-hidden="true" size={17} strokeWidth={1.7} />
             任务
-          </a>
-          <a href="/search">
+          </Link>
+          <Link href="/search">
             <Search aria-hidden="true" size={17} strokeWidth={1.7} />
             搜索
-          </a>
-          <a href="/review">
+          </Link>
+          <Link href="/review">
             <Sparkles aria-hidden="true" size={17} strokeWidth={1.7} />
             回顾
-          </a>
-          <a href="/settings">
+          </Link>
+          <Link href="/settings">
             <Settings aria-hidden="true" size={17} strokeWidth={1.7} />
             设置
-          </a>
+          </Link>
         </nav>
+
+        <SidebarTagTree />
 
         <div className={styles.sidebarFooter}>
           <div>
@@ -471,11 +645,34 @@ export function TaskWorkspace({
               <p className={styles.eyebrow}>行动</p>
               <h1>轻量任务管理</h1>
             </div>
-            {notice ? (
-              <span className={styles.notice} aria-live="polite">
-                {notice}
-              </span>
-            ) : null}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {notificationPermission !== "unsupported" ? (
+                <button
+                  className={styles.tabButton}
+                  onClick={requestNotificationPermission}
+                  style={{
+                    background:
+                      notificationPermission === "granted"
+                        ? "var(--surface-quiet)"
+                        : "var(--accent-soft)",
+                    borderColor: "var(--accent)",
+                    color: "var(--accent-strong)",
+                  }}
+                  title="点击开启或测试 macOS 桌面系统通知"
+                  type="button"
+                >
+                  <Bell size={14} />
+                  {notificationPermission === "granted"
+                    ? "测试 macOS 桌面通知"
+                    : "开启 macOS 桌面通知"}
+                </button>
+              ) : null}
+              {notice ? (
+                <span className={styles.notice} aria-live="polite">
+                  {notice}
+                </span>
+              ) : null}
+            </div>
           </div>
 
           {/* View Selection Tabs */}
@@ -573,6 +770,120 @@ export function TaskWorkspace({
               ))}
           </div>
 
+          {/* macOS System Notification Diagnostic Box for Denied State */}
+          {notificationPermission === "denied" ? (
+            <div
+              style={{
+                marginBottom: "20px",
+                padding: "14px 18px",
+                borderRadius: "var(--radius-surface)",
+                background: "var(--danger-soft)",
+                border: "1px solid var(--danger)",
+                color: "var(--ink)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontWeight: 600,
+                    color: "var(--danger)",
+                  }}
+                >
+                  <Bell size={16} />
+                  <span>macOS / 浏览器通知被拦截排查指南：</span>
+                </div>
+                <button
+                  onClick={requestNotificationPermission}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--danger)",
+                    background: "var(--surface)",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                  }}
+                  type="button"
+                >
+                  重新检测权限
+                </button>
+              </div>
+              <ol
+                style={{
+                  margin: 0,
+                  paddingLeft: "20px",
+                  fontSize: "13px",
+                  color: "var(--ink-soft)",
+                  lineHeight: "1.6",
+                }}
+              >
+                <li>
+                  <strong>Chrome 网站权限允许</strong>：点击 Chrome 地址栏最左侧的 🔒 图标/图标 ➔【网站设置】➔ 将【通知】设为“允许”（或点击“重置权限”后刷新页面）。
+                </li>
+                <li>
+                  <strong>macOS 系统设置开关</strong>：打开 macOS【系统设置】➔【通知】➔ 找到【Google Chrome】并确保开关为【允许通知】。
+                </li>
+                <li>
+                  <strong>关闭勿扰模式</strong>：检查 macOS 右上角控制中心，确保【勿扰模式 / 专注模式】未处于开启状态。
+                </li>
+              </ol>
+            </div>
+          ) : null}
+
+          {/* macOS System Notification Permission Banner for Default State */}
+          {notificationPermission === "default" ? (
+            <div
+              style={{
+                marginBottom: "20px",
+                padding: "10px 16px",
+                borderRadius: "var(--radius-control)",
+                background: "var(--surface-quiet)",
+                border: "1px solid var(--divider)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+              }}
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
+                <Bell size={16} style={{ color: "var(--accent-strong)" }} />
+                <span style={{ fontSize: "13px", color: "var(--ink-soft)" }}>
+                  允许浏览器通知，可在 macOS 桌面右上角接收任务到期提醒
+                </span>
+              </div>
+              <button
+                onClick={requestNotificationPermission}
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: "6px",
+                  background: "var(--accent)",
+                  color: "white",
+                  border: "none",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+                type="button"
+              >
+                开启 macOS 桌面通知
+              </button>
+            </div>
+          ) : null}
+
           {/* New Task Composer Card */}
           <form className={styles.composerCard} onSubmit={handleCreateTask}>
             <div className={styles.composerTitleRow}>
@@ -580,7 +891,13 @@ export function TaskWorkspace({
               <input
                 className={styles.titleInput}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="准备做什么？(支持直接创建任务)"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    void handleCreateTask(e);
+                  }
+                }}
+                placeholder="准备做什么？(支持 Cmd+Enter 快速直接添加任务)"
                 type="text"
                 value={title}
               />
@@ -590,6 +907,12 @@ export function TaskWorkspace({
               <textarea
                 className={styles.descriptionInput}
                 onChange={(e) => setDescription(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    void handleCreateTask(e);
+                  }
+                }}
                 placeholder="补充详细备注..."
                 value={description}
               />
@@ -628,13 +951,23 @@ export function TaskWorkspace({
                   </select>
                 </div>
 
-                {/* Due Date */}
-                <div className={styles.dateControl}>
+                {/* Due Date & Time */}
+                <div className={styles.dateControl} title="截止时间">
                   <Calendar size={13} />
                   <input
                     onChange={(e) => setDueDate(e.target.value)}
-                    type="date"
+                    type="datetime-local"
                     value={dueDate}
+                  />
+                </div>
+
+                {/* Reminder At */}
+                <div className={styles.dateControl} title="提醒时间">
+                  <Bell size={13} />
+                  <input
+                    onChange={(e) => setReminderAt(e.target.value)}
+                    type="datetime-local"
+                    value={reminderAt}
                   />
                 </div>
 
@@ -790,12 +1123,20 @@ export function TaskWorkspace({
                               <option value="high">高</option>
                             </select>
                           </div>
-                          <div className={styles.dateControl}>
+                          <div className={styles.dateControl} title="截止时间">
                             <Calendar size={12} />
                             <input
                               onChange={(e) => setEditDueDate(e.target.value)}
-                              type="date"
+                              type="datetime-local"
                               value={editDueDate}
+                            />
+                          </div>
+                          <div className={styles.dateControl} title="提醒时间">
+                            <Bell size={12} />
+                            <input
+                              onChange={(e) => setEditReminderAt(e.target.value)}
+                              type="datetime-local"
+                              value={editReminderAt}
                             />
                           </div>
                           <div className={styles.selectControl}>
@@ -924,6 +1265,16 @@ export function TaskWorkspace({
                                 >
                                   <Calendar size={11} />
                                   {dueLabel}
+                                </span>
+                              ) : null}
+
+                              {/* Reminder badge */}
+                              {task.reminderAt ? (
+                                <span
+                                  className={`${styles.badge} ${styles.badgeDue}`}
+                                >
+                                  <Bell size={11} />
+                                  {formatReminderLabel(task.reminderAt)}
                                 </span>
                               ) : null}
 

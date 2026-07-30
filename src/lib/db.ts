@@ -1,6 +1,8 @@
 import "server-only";
 
 import postgres, { type Sql } from "postgres";
+import { extractTags, type TagWithCount } from "./tags";
+export type { TagWithCount };
 import type {
   Memo,
   RecurrenceRule,
@@ -56,10 +58,7 @@ function database(): Sql {
     connect_timeout: 10,
   });
 
-  if (process.env.NODE_ENV !== "production") {
-    globalDatabase.shinianSql = sql;
-  }
-
+  globalDatabase.shinianSql = sql;
   return sql;
 }
 
@@ -368,20 +367,24 @@ export type SearchResult = {
   tasks: Task[];
 };
 
-export type TagWithCount = {
-  tag: string;
-  count: number;
-};
-
 export async function searchMemosAndTasks(params: {
   query?: string;
   tag?: string;
   type?: "all" | "memo" | "task";
-}): Promise<SearchResult> {
+}): Promise<{ memos: Memo[]; tasks: Task[] }> {
   const sql = database();
   const q = params.query?.trim() ?? "";
   const tag = params.tag?.trim() ?? "";
   const type = params.type ?? "all";
+
+  const isUntaggedQuery =
+    tag === "#无标签" || tag === "无标签" || q === "#无标签" || q === "无标签";
+
+  if (isUntaggedQuery) {
+    const allMemos = await listMemos();
+    const memos = allMemos.filter((m) => extractTags(m.content).length === 0);
+    return { memos, tasks: [] };
+  }
 
   let memos: Memo[] = [];
   let tasks: Task[] = [];
@@ -425,27 +428,9 @@ export async function searchMemosAndTasks(params: {
     }
   }
 
-  if (type === "all" || type === "task") {
-    if (tagPattern && memoPattern) {
-      const rows = await sql<TaskRow[]>`
-        SELECT * FROM tasks
-        WHERE deleted_at IS NULL
-          AND (title ILIKE ${memoPattern} OR description ILIKE ${memoPattern})
-          AND (title ILIKE ${tagPattern} OR description ILIKE ${tagPattern})
-        ORDER BY created_at DESC
-        LIMIT 200
-      `;
-      tasks = rows.map(toTask);
-    } else if (tagPattern) {
-      const rows = await sql<TaskRow[]>`
-        SELECT * FROM tasks
-        WHERE deleted_at IS NULL
-          AND (title ILIKE ${tagPattern} OR description ILIKE ${tagPattern})
-        ORDER BY created_at DESC
-        LIMIT 200
-      `;
-      tasks = rows.map(toTask);
-    } else if (memoPattern) {
+  // Tag filters (from tag library) return ONLY Memos, never Tasks
+  if (!tagPattern && (type === "all" || type === "task")) {
+    if (memoPattern) {
       const rows = await sql<TaskRow[]>`
         SELECT * FROM tasks
         WHERE deleted_at IS NULL
@@ -467,40 +452,34 @@ export async function getAllTagsWithCounts(): Promise<TagWithCount[]> {
   const memoRows = await sql<Array<{ content: string }>>`
     SELECT content FROM memos WHERE deleted_at IS NULL
   `;
-  const taskRows = await sql<Array<{ title: string; description: string }>>`
-    SELECT title, description FROM tasks WHERE deleted_at IS NULL
-  `;
 
   const countsMap = new Map<string, number>();
+  let untaggedCount = 0;
 
-  function scanText(text: string) {
-    if (!text) return;
-    const matches = text.match(/#[\p{L}\p{N}_/-]+/gu);
-    if (!matches) return;
-    const uniqueInText = new Set(
-      matches.map((m) => m.replace(/[.,!?;:)]+$/, "")),
-    );
-    for (const tag of uniqueInText) {
-      countsMap.set(tag, (countsMap.get(tag) ?? 0) + 1);
+  for (const m of memoRows) {
+    const memoTags = extractTags(m.content);
+    if (memoTags.length === 0) {
+      untaggedCount++;
+    } else {
+      for (const tag of new Set(memoTags)) {
+        countsMap.set(tag, (countsMap.get(tag) ?? 0) + 1);
+      }
     }
-  }
-
-  for (const m of memoRows) scanText(m.content);
-  for (const t of taskRows) {
-    scanText(t.title);
-    scanText(t.description);
   }
 
   const result: TagWithCount[] = Array.from(countsMap.entries())
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
 
+  if (untaggedCount > 0) {
+    result.unshift({ tag: "#无标签", count: untaggedCount });
+  }
+
   return result;
 }
 
 /* -------------------------------------------------------------------------- */
 /*                                Daily Review                                */
-/* -------------------------------------------------------------------------- */
 
 export async function getDailyReviewMemos(params?: {
   limit?: number;

@@ -1,6 +1,6 @@
 .shell {
   display: grid;
-  min-height: 100vh;
+  min-height: 100dvh;
   grid-template-columns: 228px minmax(0, 1fr);
   background: var(--canvas);
 }
@@ -9,13 +9,14 @@
   position: sticky;
   top: 0;
   display: flex;
-  height: 100vh;
+  height: 100dvh;
   padding:
     max(28px, env(safe-area-inset-top))
     18px
     max(20px, env(safe-area-inset-bottom));
   flex-direction: column;
   background: var(--sidebar);
+  border-right: 1px solid var(--divider);
 }
 
 .brand,
@@ -26,6 +27,7 @@
   font-family: var(--font-reading);
   font-size: 20px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .brand {
@@ -39,13 +41,17 @@
   place-items: center;
   border-radius: 12px;
   background: var(--accent);
-  color: var(--surface);
+  color: #ffffff;
   font-family: var(--font-reading);
   font-size: 21px;
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .nav {
-  margin-top: 48px;
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .nav a {
@@ -58,18 +64,20 @@
   border-radius: var(--radius-control);
   color: var(--ink-muted);
   font-size: 14px;
+  font-weight: 450;
   text-decoration: none;
-  transition-property: color, background-color, transform;
-  transition-duration: 160ms;
+  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .nav a:active {
-  transform: scale(0.96);
+  transform: scale(0.98);
 }
 
 .nav .navActive {
   color: var(--ink);
-  font-weight: 650;
+  font-weight: 600;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(70, 60, 50, 0.04);
 }
 
 .activeDot {
@@ -79,6 +87,7 @@
   height: 6px;
   border-radius: 999px;
   background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
 }
 
 .sidebarFooter {
@@ -106,7 +115,7 @@
   overflow: hidden;
   font-size: 13px;
   font-weight: 600;
-  text-overflow: clip;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -121,8 +130,7 @@
   background: transparent;
   color: var(--ink-muted);
   cursor: pointer;
-  transition-property: color, background-color, transform;
-  transition-duration: 160ms;
+  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .sidebarFooter button:active,
@@ -143,13 +151,13 @@
   width: min(100%, 768px);
   margin: 0 auto;
   padding:
-    max(64px, env(safe-area-inset-top))
+    max(56px, env(safe-area-inset-top))
     24px
     max(100px, env(safe-area-inset-bottom));
 }
 
 .composerSection {
-  animation: enter 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: enter 460ms var(--ease-spring) both;
 }
 
 .composerHeading {
@@ -161,32 +169,48 @@
 
 .eyebrow {
   margin: 0 0 3px;
-  color: var(--accent-strong);
+  color: var(--accent);
   font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .composerHeading h1 {
   margin: 0;
   font-family: var(--font-reading);
-  font-size: clamp(29px, 4vw, 38px);
+  font-size: clamp(28px, 4vw, 36px);
   font-weight: 600;
   line-height: 1.3;
+  color: var(--ink);
 }
 
 .notice {
   min-width: 60px;
   min-height: 22px;
-  color: var(--accent-strong);
+  color: var(--accent);
   font-size: 13px;
+  font-weight: 500;
   text-align: right;
 }
 
+/* Doppelrand (Double-Bezel) Composer Outer Shell */
 .composer {
-  padding: 20px 20px 16px;
-  border-radius: var(--radius-surface);
+  padding: 8px;
+  border-radius: var(--radius-shell);
+  background: var(--doppel-shell-bg);
+  border: var(--doppel-shell-border);
+  box-shadow: 0 4px 20px rgba(70, 60, 50, 0.03);
+  backdrop-filter: blur(8px);
+}
+
+/* Inner Core Container */
+.composerInner {
+  padding: 18px 18px 14px;
+  border-radius: var(--doppel-core-radius);
   background: var(--surface);
-  box-shadow: var(--shadow-composer);
+  box-shadow: var(--doppel-core-shadow);
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .composer textarea,
@@ -205,7 +229,8 @@
 }
 
 .composer textarea::placeholder {
-  color: oklch(0.64 0.018 187);
+  color: var(--ink-muted);
+  opacity: 0.7;
 }
 
 .composerFooter {
@@ -215,12 +240,14 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--divider);
 }
 
 .composerMeta {
   display: flex;
   min-width: 0;
-  padding-bottom: 7px;
+  padding-bottom: 4px;
   align-items: center;
   gap: 12px;
   color: var(--ink-muted);
@@ -229,6 +256,7 @@
 
 .errorText {
   color: var(--danger);
+  font-weight: 500;
 }
 
 .characterCount {
@@ -238,21 +266,21 @@
 .composer button,
 .saveButton {
   display: inline-flex;
-  min-width: 84px;
+  min-width: 90px;
   min-height: 40px;
-  padding: 0 14px;
+  padding: 0 16px;
   align-items: center;
   justify-content: center;
   gap: 8px;
   border: 0;
   border-radius: var(--radius-control);
   background: var(--accent);
-  color: var(--surface);
+  color: #ffffff;
   cursor: pointer;
   font-size: 14px;
-  font-weight: 650;
-  transition-property: transform, background-color, opacity;
-  transition-duration: 160ms;
+  font-weight: 600;
+  box-shadow: 0 4px 12px var(--accent-glow);
+  transition: transform var(--transition-fast), background-color var(--transition-fast), opacity var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .composer button:active,
@@ -264,11 +292,12 @@
 .saveButton:disabled {
   cursor: default;
   opacity: 0.46;
+  box-shadow: none;
 }
 
 .timeline {
-  margin-top: 64px;
-  animation: enter 520ms 80ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  margin-top: 56px;
+  animation: enter 520ms 80ms var(--ease-spring) both;
 }
 
 .timelineHeader {
@@ -283,6 +312,8 @@
   margin: 0;
   font-size: 14px;
   font-weight: 700;
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
 }
 
 .timelineHeader span {
@@ -297,17 +328,17 @@
 }
 
 .dayGroup {
-  display: grid;
-  padding-top: 34px;
-  grid-template-columns: 86px minmax(0, 1fr);
-  column-gap: 24px;
+  display: flex;
+  flex-direction: column;
+  padding-top: 28px;
 }
 
 .dayLabel {
-  position: sticky;
-  top: 24px;
-  height: fit-content;
-  padding-top: 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 0 4px;
 }
 
 .dayLabel h3 {
@@ -318,8 +349,8 @@
 }
 
 .dayLabel span {
-  display: block;
-  margin-top: 4px;
+  display: inline;
+  margin-top: 0;
   color: var(--ink-muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -327,11 +358,18 @@
 
 .memo {
   position: relative;
-  padding: 0 4px 28px;
-  margin-bottom: 28px;
-  border-bottom: 1px solid var(--divider);
-  transition-property: background-color, box-shadow, transform, opacity;
-  transition-duration: 180ms;
+  padding: 16px;
+  margin-bottom: 20px;
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  box-shadow: 0 2px 10px rgba(70, 60, 50, 0.02);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.memo:hover {
+  border-color: rgba(200, 109, 81, 0.25);
+  box-shadow: 0 6px 20px rgba(70, 60, 50, 0.04);
 }
 
 .memo:last-child {
@@ -339,13 +377,12 @@
 }
 
 .memoNew {
-  animation: memoEnter 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: memoEnter 560ms var(--ease-spring) both;
 }
 
 .memoEditing {
   padding: 18px;
-  border-bottom-color: transparent;
-  border-radius: var(--radius-surface);
+  border-color: var(--accent);
   background: var(--surface);
   box-shadow: var(--shadow-composer);
 }
@@ -356,7 +393,7 @@
   align-items: center;
   gap: 10px;
   color: var(--ink-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -366,37 +403,44 @@
 }
 
 .memoContent {
-  margin: 9px 0 0;
+  margin: 10px 0 0;
   color: var(--ink);
   font-size: 16px;
-  line-height: 1.78;
+  line-height: 1.75;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   text-wrap: pretty;
 }
 
 .inlineTag {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 2px;
+  border-radius: 6px;
+  background: var(--accent-soft);
   color: var(--accent-strong);
   font-weight: 600;
+  font-size: 13px;
 }
 
 .memoActions {
   display: flex;
-  min-height: 40px;
-  margin-top: 13px;
+  min-height: 36px;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--divider);
   align-items: center;
   gap: 4px;
   opacity: 0;
   transform: translateY(3px);
-  transition-property: opacity, transform;
-  transition-duration: 160ms;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 
 .memoActions button,
 .quietButton,
 .deleteConfirm button {
   display: inline-flex;
-  min-height: 40px;
+  min-height: 36px;
   padding: 0 10px;
   align-items: center;
   gap: 6px;
@@ -406,8 +450,7 @@
   color: var(--ink-muted);
   cursor: pointer;
   font-size: 12px;
-  transition-property: color, background-color, transform;
-  transition-duration: 160ms;
+  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .memoActions button:active,
@@ -425,6 +468,7 @@
   gap: 3px;
   border-radius: var(--radius-control);
   background: var(--danger-soft);
+  border: 1px solid rgba(194, 65, 12, 0.2);
 }
 
 .deleteConfirm span {
@@ -437,6 +481,7 @@
 .deleteConfirm .deleteButton {
   color: var(--danger);
   font-weight: 650;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .editPanel textarea {
@@ -461,7 +506,8 @@
 .emptyState > span {
   display: block;
   width: 36px;
-  height: 2px;
+  height: 3px;
+  border-radius: 2px;
   overflow: hidden;
   background: var(--accent);
   color: transparent;
@@ -493,25 +539,25 @@
   gap: 16px;
   border-radius: 12px;
   background: var(--ink);
-  box-shadow: 0 12px 28px rgb(24 35 33 / 0.2);
+  box-shadow: var(--shadow-floating);
   color: var(--surface);
   font-size: 13px;
-  animation: toastEnter 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: toastEnter 260ms var(--ease-spring) both;
 }
 
 .undoToast button {
   display: inline-flex;
   min-height: 38px;
-  padding: 0 10px;
+  padding: 0 12px;
   align-items: center;
   gap: 6px;
   border: 0;
   border-radius: 8px;
-  background: rgb(255 255 255 / 0.1);
+  background: rgba(255, 255, 255, 0.15);
   color: inherit;
   cursor: pointer;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .visuallyHidden {
@@ -528,7 +574,7 @@
 
 .errorPage {
   display: flex;
-  min-height: 100vh;
+  min-height: 100dvh;
   max-width: 620px;
   margin: 0 auto;
   padding: 14vh 24px 64px;
@@ -552,18 +598,18 @@
 .errorPage button {
   display: inline-flex;
   min-height: 40px;
-  padding: 0 14px;
+  padding: 0 16px;
   align-items: center;
   gap: 8px;
   border: 0;
   border-radius: var(--radius-control);
-  background: var(--ink);
-  color: var(--surface);
+  background: var(--accent);
+  color: #ffffff;
 }
 
 @media (hover: hover) {
   .nav a:hover {
-    background: oklch(0.91 0.016 82);
+    background: var(--surface-quiet);
     color: var(--ink);
   }
 
@@ -576,6 +622,7 @@
   .composer button:hover:not(:disabled),
   .saveButton:hover:not(:disabled) {
     background: var(--accent-strong);
+    box-shadow: 0 6px 16px var(--accent-glow);
   }
 
   .memo:hover .memoActions,
@@ -592,7 +639,7 @@
   }
 
   .deleteConfirm .deleteButton:hover {
-    background: oklch(0.88 0.055 27);
+    background: #ffffff;
     color: var(--danger);
   }
 }
@@ -655,6 +702,7 @@
     align-items: center;
     justify-content: space-between;
     background: color-mix(in oklch, var(--canvas) 94%, transparent);
+    backdrop-filter: blur(12px);
     box-shadow: 0 1px 0 var(--divider);
   }
 
@@ -687,7 +735,11 @@
   }
 
   .composer {
-    padding: 17px 16px 14px;
+    padding: 6px;
+  }
+
+  .composerInner {
+    padding: 14px 14px 12px;
   }
 
   .composerFooter {
@@ -699,29 +751,11 @@
   }
 
   .timeline {
-    margin-top: 52px;
-  }
-
-  .dayGroup {
-    display: block;
-    padding-top: 30px;
-  }
-
-  .dayLabel {
-    position: static;
-    display: flex;
-    margin-bottom: 22px;
-    align-items: baseline;
-    gap: 8px;
-  }
-
-  .dayLabel span {
-    display: inline;
-    margin-top: 0;
+    margin-top: 48px;
   }
 
   .memo {
-    padding-inline: 2px;
+    padding: 14px;
   }
 
   .memoActions {
@@ -750,12 +784,7 @@
     font-size: 27px;
   }
 
-  .composer {
-    padding-inline: 14px;
-  }
-
   .deleteConfirm {
     flex-wrap: wrap;
   }
 }
-

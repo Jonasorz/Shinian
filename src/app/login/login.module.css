@@ -1,12 +1,13 @@
 .page {
   display: grid;
-  min-height: 100vh;
+  min-height: 100dvh;
   grid-template-columns: minmax(0, 1.08fr) minmax(420px, 0.92fr);
+  background: var(--canvas);
 }
 
 .intro {
   display: flex;
-  min-height: 100vh;
+  min-height: 100dvh;
   padding:
     max(40px, env(safe-area-inset-top))
     clamp(32px, 6vw, 92px)
@@ -14,15 +15,16 @@
   flex-direction: column;
   justify-content: space-between;
   background: var(--sidebar);
+  border-right: 1px solid var(--divider);
 }
 
 .brandRow {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--ink-soft);
+  color: var(--ink);
   font-family: var(--font-reading);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
 }
 
@@ -33,8 +35,9 @@
   place-items: center;
   border-radius: 13px;
   background: var(--accent);
-  color: var(--surface);
+  color: #ffffff;
   font-size: 23px;
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .statement {
@@ -44,18 +47,20 @@
 
 .kicker {
   margin: 0 0 20px;
-  color: var(--accent-strong);
-  font-size: 14px;
-  font-weight: 650;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .statement h1 {
   margin: 0;
   color: var(--ink);
   font-family: var(--font-reading);
-  font-size: clamp(45px, 6vw, 76px);
+  font-size: clamp(42px, 5.5vw, 72px);
   font-weight: 600;
-  line-height: 1.16;
+  line-height: 1.18;
   text-wrap: balance;
 }
 
@@ -70,7 +75,7 @@
 
 .loginArea {
   display: flex;
-  min-height: 100vh;
+  min-height: 100dvh;
   padding:
     max(40px, env(safe-area-inset-top))
     clamp(32px, 6vw, 88px)
@@ -83,13 +88,18 @@
 .formFrame {
   width: min(100%, 410px);
   margin: auto;
+  padding: 32px 28px;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-shell);
+  background: var(--surface);
+  box-shadow: var(--shadow-floating);
 }
 
 .formLabel {
-  margin: 0 0 30px;
+  margin: 0 0 28px;
   color: var(--ink);
   font-family: var(--font-reading);
-  font-size: 27px;
+  font-size: 26px;
   font-weight: 600;
 }
 
@@ -117,15 +127,15 @@
   padding: 0 14px;
   border: 1px solid var(--divider);
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: var(--surface-quiet);
   color: var(--ink);
-  transition-property: border-color, box-shadow;
-  transition-duration: 160ms;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .form input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--focus);
+  background: var(--surface);
   outline: none;
 }
 
@@ -140,38 +150,40 @@
 .formStatus p {
   margin: 0;
   color: var(--danger);
+  font-weight: 500;
 }
 
 .form button {
   display: flex;
   min-height: 46px;
-  padding: 0 16px;
+  padding: 0 18px;
   align-items: center;
   justify-content: space-between;
   border: 0;
   border-radius: var(--radius-control);
-  background: var(--ink);
-  color: var(--surface);
+  background: var(--accent);
+  color: #ffffff;
   cursor: pointer;
   font-size: 14px;
-  font-weight: 650;
-  transition-property: transform, background-color, opacity;
-  transition-duration: 160ms;
+  font-weight: 600;
+  box-shadow: 0 4px 12px var(--accent-glow);
+  transition: transform var(--transition-fast), background-color var(--transition-fast), opacity var(--transition-fast);
 }
 
 .form button:active {
-  transform: scale(0.96);
+  transform: scale(0.98);
 }
 
 .form button:disabled {
   cursor: wait;
   opacity: 0.62;
+  box-shadow: none;
 }
 
 .footer {
   display: flex;
   min-height: 40px;
-  margin: 40px auto 0;
+  margin: 32px auto 0;
   align-items: center;
   gap: 12px;
   color: var(--ink-muted);
@@ -200,18 +212,20 @@
   .intro {
     min-height: auto;
     padding: 28px 24px 38px;
+    border-right: none;
+    border-bottom: 1px solid var(--divider);
   }
 
   .statement {
-    padding: 78px 0 0;
+    padding: 48px 0 0;
   }
 
   .statement h1 {
-    font-size: clamp(40px, 11vw, 58px);
+    font-size: clamp(36px, 10vw, 54px);
   }
 
   .description {
-    margin-top: 22px;
+    margin-top: 20px;
     font-size: 15px;
   }
 
@@ -222,6 +236,7 @@
 
   .formFrame {
     margin: 0 auto;
+    padding: 24px 20px;
   }
 }
 
@@ -231,11 +246,10 @@
   }
 
   .statement {
-    padding-top: 54px;
+    padding-top: 36px;
   }
 
   .loginArea {
     padding-inline: 18px;
   }
 }
-

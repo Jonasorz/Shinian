@@ -2,17 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { SidebarTagTree } from "./SidebarTagTree";
 import {
   CheckSquare,
   Feather,
   LogOut,
   Search,
+  Settings,
   Sparkles,
   Tag,
   X,
 } from "lucide-react";
 import type { Memo, Task } from "@/lib/types";
-import type { TagWithCount } from "@/lib/db";
+import type { TagWithCount } from "@/lib/tags";
 import styles from "@/app/search/search.module.css";
 
 type SearchWorkspaceProps = {
@@ -118,14 +121,26 @@ export function SearchWorkspace({
   // Combined and sorted results
   const combinedResults = useMemo(() => {
     const list: Array<
-      { kind: "memo"; item: Memo; date: string } | { kind: "task"; item: Task; date: string }
+      | { kind: "memo"; item: Memo; date: string }
+      | { kind: "task"; item: Task; date: string }
     > = [];
 
+    const memoIdSet = new Set(memos.map((m) => m.id));
+
     if (type === "all" || type === "memo") {
-      memos.forEach((m) => list.push({ kind: "memo", item: m, date: m.createdAt }));
+      memos.forEach((m) =>
+        list.push({ kind: "memo", item: m, date: m.createdAt }),
+      );
     }
     if (type === "all" || type === "task") {
-      tasks.forEach((t) => list.push({ kind: "task", item: t, date: t.createdAt }));
+      tasks.forEach((t) => {
+        // If searching all and task was auto-created from a memo present in the list,
+        // skip duplicate task card so it renders cleanly as a Memo card.
+        if (type === "all" && t.sourceMemoId && memoIdSet.has(t.sourceMemoId)) {
+          return;
+        }
+        list.push({ kind: "task", item: t, date: t.createdAt });
+      });
     }
 
     return list.sort(
@@ -145,24 +160,33 @@ export function SearchWorkspace({
         </div>
 
         <nav aria-label="主要导航" className={styles.nav}>
-          <a href="/notes">
+          <Link href="/notes">
             <Feather aria-hidden="true" size={17} strokeWidth={1.7} />
             记录
-          </a>
-          <a href="/tasks">
+          </Link>
+          <Link href="/tasks">
             <CheckSquare aria-hidden="true" size={17} strokeWidth={1.7} />
             任务
-          </a>
-          <a aria-current="page" className={styles.navActive} href="/search">
+          </Link>
+          <Link aria-current="page" className={styles.navActive} href="/search">
             <span className={styles.activeDot} aria-hidden="true" />
             <Search aria-hidden="true" size={17} strokeWidth={1.7} />
             搜索
-          </a>
-          <a href="/review">
+          </Link>
+          <Link href="/review">
             <Sparkles aria-hidden="true" size={17} strokeWidth={1.7} />
             回顾
-          </a>
+          </Link>
+          <Link href="/settings">
+            <Settings aria-hidden="true" size={17} strokeWidth={1.7} />
+            设置
+          </Link>
         </nav>
+
+        <SidebarTagTree
+          activeTag={query}
+          onSelectTag={(tag) => setQuery(tag)}
+        />
 
         <div className={styles.sidebarFooter}>
           <div>

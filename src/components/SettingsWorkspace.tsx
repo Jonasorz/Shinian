@@ -2,6 +2,8 @@
 
 import { ChangeEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { SidebarTagTree } from "./SidebarTagTree";
 import {
   CheckSquare,
   Download,
@@ -186,28 +188,30 @@ export function SettingsWorkspace({
         </div>
 
         <nav aria-label="主要导航" className={styles.nav}>
-          <a href="/notes">
+          <Link href="/notes">
             <Feather aria-hidden="true" size={17} strokeWidth={1.7} />
             记录
-          </a>
-          <a href="/tasks">
+          </Link>
+          <Link href="/tasks">
             <CheckSquare aria-hidden="true" size={17} strokeWidth={1.7} />
             任务
-          </a>
-          <a href="/search">
+          </Link>
+          <Link href="/search">
             <Search aria-hidden="true" size={17} strokeWidth={1.7} />
             搜索
-          </a>
-          <a href="/review">
+          </Link>
+          <Link href="/review">
             <Sparkles aria-hidden="true" size={17} strokeWidth={1.7} />
             回顾
-          </a>
-          <a aria-current="page" className={styles.navActive} href="/settings">
+          </Link>
+          <Link aria-current="page" className={styles.navActive} href="/settings">
             <span className={styles.activeDot} aria-hidden="true" />
             <Settings aria-hidden="true" size={17} strokeWidth={1.7} />
-            设置与数据
-          </a>
+            设置
+          </Link>
         </nav>
+
+        <SidebarTagTree />
 
         <div className={styles.sidebarFooter}>
           <div>

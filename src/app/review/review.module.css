@@ -1,6 +1,6 @@
 .shell {
   display: grid;
-  min-height: 100vh;
+  min-height: 100dvh;
   grid-template-columns: 228px minmax(0, 1fr);
   background: var(--canvas);
 }
@@ -9,13 +9,14 @@
   position: sticky;
   top: 0;
   display: flex;
-  height: 100vh;
+  height: 100dvh;
   padding:
     max(28px, env(safe-area-inset-top))
     18px
     max(20px, env(safe-area-inset-bottom));
   flex-direction: column;
   background: var(--sidebar);
+  border-right: 1px solid var(--divider);
 }
 
 .brand,
@@ -26,6 +27,7 @@
   font-family: var(--font-reading);
   font-size: 20px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .brand {
@@ -39,13 +41,14 @@
   place-items: center;
   border-radius: 12px;
   background: var(--accent);
-  color: var(--surface);
+  color: #ffffff;
   font-family: var(--font-reading);
   font-size: 21px;
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .nav {
-  margin-top: 48px;
+  margin-top: 40px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -61,18 +64,20 @@
   border-radius: var(--radius-control);
   color: var(--ink-muted);
   font-size: 14px;
+  font-weight: 450;
   text-decoration: none;
-  transition: color 160ms, background-color 160ms, transform 160ms;
+  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .nav a:active {
-  transform: scale(0.96);
+  transform: scale(0.98);
 }
 
 .nav .navActive {
   color: var(--ink);
-  font-weight: 650;
-  background: oklch(0.95 0.01 82);
+  font-weight: 600;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(70, 60, 50, 0.04);
 }
 
 .activeDot {
@@ -82,6 +87,7 @@
   height: 6px;
   border-radius: 999px;
   background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
 }
 
 .sidebarFooter {
@@ -102,7 +108,7 @@
 
 .sidebarFooter span {
   color: var(--ink-muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .sidebarFooter strong {
@@ -122,8 +128,9 @@
   border: none;
   border-radius: var(--radius-small);
   background: transparent;
-  color: var(--ink-soft);
+  color: var(--ink-muted);
   cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
 .sidebarFooter button:hover {
@@ -135,7 +142,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 36px 24px 72px;
+  padding: 40px 24px 72px;
 }
 
 .mobileHeader {
@@ -156,10 +163,11 @@
 
 .eyebrow {
   margin: 0 0 4px;
-  color: var(--ink-muted);
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .pageHeader h1 {
@@ -181,8 +189,8 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 6px oklch(0 0 0 / 0.03);
-  transition: all 160ms;
+  box-shadow: 0 2px 6px rgba(70, 60, 50, 0.03);
+  transition: all var(--transition-fast);
 }
 
 .refreshButton:hover:not(:disabled) {
@@ -202,7 +210,6 @@
   font-weight: 500;
 }
 
-/* Section cards */
 .sectionTitle {
   display: flex;
   align-items: center;
@@ -217,10 +224,10 @@
 .yearAgoBanner {
   margin-bottom: 24px;
   padding: 20px 24px;
-  border: 1px solid oklch(0.85 0.05 70);
+  border: 1px solid var(--divider);
   border-radius: var(--radius-surface);
-  background: oklch(0.97 0.02 75);
-  box-shadow: 0 4px 16px oklch(0 0 0 / 0.04);
+  background: var(--accent-soft);
+  box-shadow: 0 4px 16px rgba(70, 60, 50, 0.04);
 }
 
 .yearAgoHeader {
@@ -228,7 +235,7 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
-  color: oklch(0.45 0.12 60);
+  color: var(--accent-strong);
   font-size: 14px;
   font-weight: 600;
 }
@@ -249,11 +256,12 @@
   border-radius: var(--radius-surface);
   background: var(--surface);
   box-shadow: var(--shadow-composer);
-  transition: border-color 160ms;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .memoCard:hover {
-  border-color: oklch(0.8 0.03 82);
+  border-color: rgba(200, 109, 81, 0.3);
+  box-shadow: 0 6px 20px rgba(70, 60, 50, 0.05);
 }
 
 .memoTop {
@@ -262,6 +270,7 @@
   justify-content: space-between;
   color: var(--ink-muted);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .memoContent {
@@ -269,7 +278,7 @@
   color: var(--ink);
   font-family: var(--font-reading);
   font-size: 16px;
-  line-height: 1.65;
+  line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -307,11 +316,11 @@
   color: var(--ink-soft);
   font-size: 12px;
   cursor: pointer;
-  transition: background 160ms, color 160ms;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .actionButton:hover {
-  background: oklch(0.93 0.015 82);
+  background: var(--divider);
   color: var(--ink);
 }
 

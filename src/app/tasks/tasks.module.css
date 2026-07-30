@@ -1,6 +1,6 @@
 .shell {
   display: grid;
-  min-height: 100vh;
+  min-height: 100dvh;
   grid-template-columns: 228px minmax(0, 1fr);
   background: var(--canvas);
 }
@@ -9,13 +9,14 @@
   position: sticky;
   top: 0;
   display: flex;
-  height: 100vh;
+  height: 100dvh;
   padding:
     max(28px, env(safe-area-inset-top))
     18px
     max(20px, env(safe-area-inset-bottom));
   flex-direction: column;
   background: var(--sidebar);
+  border-right: 1px solid var(--divider);
 }
 
 .brand,
@@ -26,6 +27,7 @@
   font-family: var(--font-reading);
   font-size: 20px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .brand {
@@ -39,13 +41,14 @@
   place-items: center;
   border-radius: 12px;
   background: var(--accent);
-  color: var(--surface);
+  color: #ffffff;
   font-family: var(--font-reading);
   font-size: 21px;
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .nav {
-  margin-top: 48px;
+  margin-top: 40px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -61,18 +64,20 @@
   border-radius: var(--radius-control);
   color: var(--ink-muted);
   font-size: 14px;
+  font-weight: 450;
   text-decoration: none;
-  transition: color 160ms, background-color 160ms, transform 160ms;
+  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .nav a:active {
-  transform: scale(0.96);
+  transform: scale(0.98);
 }
 
 .nav .navActive {
   color: var(--ink);
-  font-weight: 650;
-  background: oklch(0.95 0.01 82);
+  font-weight: 600;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(70, 60, 50, 0.04);
 }
 
 .activeDot {
@@ -82,6 +87,7 @@
   height: 6px;
   border-radius: 999px;
   background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
 }
 
 .sidebarFooter {
@@ -102,7 +108,7 @@
 
 .sidebarFooter span {
   color: var(--ink-muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .sidebarFooter strong {
@@ -122,8 +128,9 @@
   border: none;
   border-radius: var(--radius-small);
   background: transparent;
-  color: var(--ink-soft);
+  color: var(--ink-muted);
   cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
 .sidebarFooter button:hover {
@@ -135,7 +142,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 36px 24px 72px;
+  padding: 40px 24px 72px;
 }
 
 .mobileHeader {
@@ -156,10 +163,11 @@
 
 .eyebrow {
   margin: 0 0 4px;
-  color: var(--ink-muted);
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .pageHeader h1 {
@@ -175,6 +183,7 @@
   font-weight: 500;
 }
 
+/* View Tabs Filter Pills */
 .viewTabs {
   display: flex;
   flex-wrap: wrap;
@@ -188,20 +197,21 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  border: 1px solid transparent;
+  padding: 8px 16px;
+  border: 1px solid var(--divider);
   border-radius: 999px;
   background: var(--surface-quiet);
   color: var(--ink-soft);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 160ms;
+  transition: all var(--transition-fast);
 }
 
 .tabButton:hover {
   background: var(--surface);
   color: var(--ink);
+  border-color: rgba(200, 109, 81, 0.3);
 }
 
 .activeTab {
@@ -209,20 +219,21 @@
   border-color: var(--accent);
   color: var(--accent-strong);
   font-weight: 600;
-  box-shadow: 0 2px 6px oklch(0 0 0 / 0.04);
+  box-shadow: 0 2px 8px var(--accent-glow);
 }
 
 .tabCount {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
   border-radius: 999px;
   background: var(--divider);
   color: var(--ink-soft);
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .activeTab .tabCount {
@@ -323,11 +334,12 @@
   border: none;
   border-radius: var(--radius-control);
   background: var(--accent);
-  color: var(--surface);
+  color: #ffffff;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 160ms, transform 120ms;
+  box-shadow: 0 4px 12px var(--accent-glow);
+  transition: background var(--transition-fast), transform var(--transition-fast);
 }
 
 .submitTaskButton:hover:not(:disabled) {
@@ -337,6 +349,7 @@
 .submitTaskButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* Task List */
@@ -366,12 +379,12 @@
   border: 1px solid var(--divider);
   border-radius: var(--radius-surface);
   background: var(--surface);
-  transition: border-color 160ms, box-shadow 160ms;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
 .taskCard:hover {
-  border-color: oklch(0.8 0.03 82);
-  box-shadow: 0 4px 12px oklch(0 0 0 / 0.03);
+  border-color: rgba(200, 109, 81, 0.3);
+  box-shadow: 0 6px 20px rgba(70, 60, 50, 0.04);
 }
 
 .taskDone {
@@ -397,7 +410,7 @@
   color: transparent;
   cursor: pointer;
   flex-shrink: 0;
-  transition: all 160ms;
+  transition: all var(--transition-fast);
 }
 
 .checkButton:hover {
@@ -408,7 +421,7 @@
 .checkButtonDone {
   border-color: var(--accent);
   background: var(--accent);
-  color: var(--surface);
+  color: #ffffff;
 }
 
 .taskBody {
@@ -454,6 +467,7 @@
   border-radius: var(--radius-small);
   font-size: 11px;
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .badgeList {
@@ -479,8 +493,8 @@
 }
 
 .priorityMedium {
-  background: oklch(0.93 0.06 70);
-  color: oklch(0.45 0.12 60);
+  background: #FEF3C7;
+  color: #92400E;
   font-weight: 600;
 }
 
@@ -500,7 +514,7 @@
   align-items: center;
   gap: 6px;
   opacity: 0;
-  transition: opacity 160ms;
+  transition: opacity var(--transition-fast);
 }
 
 .taskCard:hover .taskActions,
@@ -519,6 +533,7 @@
   color: var(--ink-muted);
   font-size: 12px;
   cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .taskActionButton:hover {
@@ -543,7 +558,7 @@
 
 .deleteConfirmButton {
   background: var(--danger) !important;
-  color: var(--surface) !important;
+  color: #ffffff !important;
   border: none !important;
 }
 
@@ -561,7 +576,7 @@
   background: var(--ink);
   color: var(--surface);
   font-size: 13px;
-  box-shadow: 0 10px 25px oklch(0 0 0 / 0.18);
+  box-shadow: var(--shadow-floating);
 }
 
 .undoToast button {
