@@ -14,7 +14,7 @@ describe("flomo HTML importer", () => {
       </div>
       <div class="memo">
         <div class="time">2026-07-21 15:30:00</div>
-        <div class="content"><p>思考自托管系统的 #架构 设计</p></div>
+        <div class="content"><p>思考个人云系统的 #架构 设计</p></div>
       </div>
     `;
 
@@ -31,7 +31,7 @@ describe("TickTick CSV importer", () => {
   it("parses TickTick CSV columns properly", () => {
     const csv = `
 Title,Content,List Name,Due Date,Priority,Status
-"完成项目上线","连接 VPS 服务器","工作","2026-07-30","High","0"
+"完成项目上线","连接 Neon 数据库","工作","2026-07-30","High","0"
 "买咖啡","","个人","2026-07-28","Low","2"
     `.trim();
 
@@ -40,7 +40,7 @@ Title,Content,List Name,Due Date,Priority,Status
     expect(result.tasks.length).toBe(2);
 
     expect(result.tasks[0]!.title).toBe("完成项目上线");
-    expect(result.tasks[0]!.description).toBe("连接 VPS 服务器");
+    expect(result.tasks[0]!.description).toBe("连接 Neon 数据库");
     expect(result.tasks[0]!.listName).toBe("工作");
     expect(result.tasks[0]!.priority).toBe("high");
     expect(result.tasks[0]!.status).toBe("todo");

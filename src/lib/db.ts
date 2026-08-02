@@ -2,9 +2,11 @@ import "server-only";
 
 import postgres, { type Sql } from "postgres";
 import { extractTags, type TagWithCount } from "./tags";
+import { nextOccurrence } from "./recurrence";
 export type { TagWithCount };
 import type {
   Memo,
+  MemoAttachment,
   RecurrenceRule,
   Task,
   TaskFilterView,
@@ -36,6 +38,7 @@ type TaskRow = {
   created_at: Date;
   updated_at: Date;
   deleted_at: Date | null;
+  previous_task_id: string | null;
 };
 
 const globalDatabase = globalThis as typeof globalThis & {
@@ -53,7 +56,7 @@ function database(): Sql {
   }
 
   const sql = postgres(databaseUrl, {
-    max: process.env.NODE_ENV === "production" ? 10 : 3,
+    max: process.env.VERCEL ? 1 : process.env.NODE_ENV === "production" ? 10 : 3,
     idle_timeout: 20,
     connect_timeout: 10,
   });
@@ -69,7 +72,50 @@ function toMemo(row: MemoRow): Memo {
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
     deletedAt: row.deleted_at?.toISOString() ?? null,
+    attachments: [],
   };
+}
+
+type AttachmentRow = {
+  id: string;
+  memo_id: string;
+  filename: string;
+  content_type: string;
+  byte_size: number;
+  storage_key: string;
+  created_at: Date;
+};
+
+function toAttachment(row: AttachmentRow): MemoAttachment {
+  return {
+    id: row.id,
+    memoId: row.memo_id,
+    filename: row.filename,
+    contentType: row.content_type,
+    byteSize: row.byte_size,
+    createdAt: row.created_at.toISOString(),
+    url: `/api/attachments/${row.id}`,
+  };
+}
+
+async function withMemoAttachments(memos: Memo[]): Promise<Memo[]> {
+  if (memos.length === 0) return memos;
+  const ids = memos.map((memo) => memo.id);
+  const rows = await database()<AttachmentRow[]>`
+    SELECT * FROM memo_attachments
+    WHERE memo_id IN ${database()(ids)}
+    ORDER BY created_at ASC
+  `;
+  const byMemo = new Map<string, MemoAttachment[]>();
+  for (const row of rows) {
+    const list = byMemo.get(row.memo_id) ?? [];
+    list.push(toAttachment(row));
+    byMemo.set(row.memo_id, list);
+  }
+  return memos.map((memo) => ({
+    ...memo,
+    attachments: byMemo.get(memo.id) ?? [],
+  }));
 }
 
 function toTask(row: TaskRow): Task {
@@ -101,7 +147,16 @@ export async function listMemos(): Promise<Memo[]> {
     LIMIT 500
   `;
 
-  return rows.map(toMemo);
+  return withMemoAttachments(rows.map(toMemo));
+}
+
+export async function listAllMemos(): Promise<Memo[]> {
+  const rows = await database()<MemoRow[]>`
+    SELECT id, content, created_at, updated_at, deleted_at
+    FROM memos
+    ORDER BY created_at DESC
+  `;
+  return withMemoAttachments(rows.map(toMemo));
 }
 
 export async function createMemo(content: string): Promise<Memo> {
@@ -138,7 +193,8 @@ export async function updateMemo(
     `;
   }
 
-  return rows[0] ? toMemo(rows[0]) : null;
+  if (!rows[0]) return null;
+  return (await withMemoAttachments([toMemo(rows[0])]))[0] ?? null;
 }
 
 export async function softDeleteMemo(id: string): Promise<Memo | null> {
@@ -149,7 +205,52 @@ export async function softDeleteMemo(id: string): Promise<Memo | null> {
     RETURNING id, content, created_at, updated_at, deleted_at
   `;
 
-  return rows[0] ? toMemo(rows[0]) : null;
+  if (!rows[0]) return null;
+  return (await withMemoAttachments([toMemo(rows[0])]))[0] ?? null;
+}
+
+export type StoredMemoAttachment = MemoAttachment & { storageKey: string };
+
+export async function createMemoAttachment(input: {
+  memoId: string;
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  storageKey: string;
+}): Promise<MemoAttachment | null> {
+  const id = crypto.randomUUID();
+  const rows = await database()<AttachmentRow[]>`
+    INSERT INTO memo_attachments (
+      id, memo_id, filename, content_type, byte_size, storage_key
+    )
+    SELECT ${id}, id, ${input.filename}, ${input.contentType},
+      ${input.byteSize}, ${input.storageKey}
+    FROM memos
+    WHERE id = ${input.memoId} AND deleted_at IS NULL
+    RETURNING *
+  `;
+  return rows[0] ? toAttachment(rows[0]) : null;
+}
+
+export async function getStoredMemoAttachment(
+  id: string,
+): Promise<StoredMemoAttachment | null> {
+  const rows = await database()<AttachmentRow[]>`
+    SELECT a.* FROM memo_attachments a
+    JOIN memos m ON m.id = a.memo_id
+    WHERE a.id = ${id} AND m.deleted_at IS NULL
+  `;
+  const row = rows[0];
+  return row ? { ...toAttachment(row), storageKey: row.storage_key } : null;
+}
+
+export async function listStoredMemoAttachments(): Promise<StoredMemoAttachment[]> {
+  const rows = await database()<AttachmentRow[]>`
+    SELECT a.* FROM memo_attachments a
+    JOIN memos m ON m.id = a.memo_id
+    ORDER BY a.created_at ASC
+  `;
+  return rows.map((row) => ({ ...toAttachment(row), storageKey: row.storage_key }));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -217,6 +318,13 @@ export async function listTasks(params?: {
     `;
   }
 
+  return rows.map(toTask);
+}
+
+export async function listAllTasks(): Promise<Task[]> {
+  const rows = await database()<TaskRow[]>`
+    SELECT * FROM tasks ORDER BY created_at DESC
+  `;
   return rows.map(toTask);
 }
 
@@ -347,6 +455,42 @@ export async function updateTask(
   return row ? toTask(row) : null;
 }
 
+export async function createNextRecurringTask(
+  completedTaskId: string,
+): Promise<Task | null> {
+  const sql = database();
+  const [existing] = await sql<TaskRow[]>`
+    SELECT * FROM tasks
+    WHERE id = ${completedTaskId}
+      AND status = 'done'
+      AND recurrence_rule <> 'none'
+      AND deleted_at IS NULL
+  `;
+
+  if (!existing) return null;
+
+  const task = toTask(existing);
+  const id = crypto.randomUUID();
+  const [next] = await sql<TaskRow[]>`
+    INSERT INTO tasks (
+      id, title, description, status, priority, list_name,
+      start_date, due_date, reminder_at, recurrence_rule,
+      source_memo_id, previous_task_id
+    ) VALUES (
+      ${id}, ${task.title}, ${task.description}, 'todo', ${task.priority},
+      ${task.listName},
+      ${nextOccurrence(task.startDate, task.recurrenceRule)},
+      ${nextOccurrence(task.dueDate, task.recurrenceRule)},
+      ${nextOccurrence(task.reminderAt, task.recurrenceRule)},
+      ${task.recurrenceRule}, ${task.sourceMemoId}, ${completedTaskId}
+    )
+    ON CONFLICT (previous_task_id) WHERE previous_task_id IS NOT NULL DO NOTHING
+    RETURNING *
+  `;
+
+  return next ? toTask(next) : null;
+}
+
 export async function softDeleteTask(id: string): Promise<Task | null> {
   const [row] = await database()<TaskRow[]>`
     UPDATE tasks
@@ -444,7 +588,7 @@ export async function searchMemosAndTasks(params: {
     }
   }
 
-  return { memos, tasks };
+  return { memos: await withMemoAttachments(memos), tasks };
 }
 
 export async function getAllTagsWithCounts(): Promise<TagWithCount[]> {
@@ -507,7 +651,7 @@ export async function getDailyReviewMemos(params?: {
     `;
   }
 
-  return rows.map(toMemo);
+  return withMemoAttachments(rows.map(toMemo));
 }
 
 export async function getYearAgoMemos(): Promise<Memo[]> {
@@ -521,7 +665,7 @@ export async function getYearAgoMemos(): Promise<Memo[]> {
     LIMIT 10
   `;
 
-  return rows.map(toMemo);
+  return withMemoAttachments(rows.map(toMemo));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -634,7 +778,3 @@ export async function undoImportBatch(batchId: string): Promise<boolean> {
   });
   return true;
 }
-
-
-
-

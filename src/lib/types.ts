@@ -1,9 +1,20 @@
+export type MemoAttachment = {
+  id: string;
+  memoId: string;
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  createdAt: string;
+  url: string;
+};
+
 export type Memo = {
   id: string;
   content: string;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  attachments: MemoAttachment[];
 };
 
 export type TaskStatus = "inbox" | "todo" | "doing" | "done" | "cancelled";
@@ -39,4 +50,3 @@ export type TaskFilterView = "inbox" | "today" | "next7" | "completed" | "all";
 export type SessionUser = {
   username: string;
 };
-

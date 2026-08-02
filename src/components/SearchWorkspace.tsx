@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SidebarTagTree } from "./SidebarTagTree";
+import { MobileNavigation } from "./MobileNavigation";
 import {
   CheckSquare,
   Feather,
@@ -209,18 +210,12 @@ export function SearchWorkspace({
             </div>
             <span>Shinian</span>
           </div>
-          <div className={styles.mobileNav}>
-            <a href="/notes">记录</a>
-            <a href="/tasks">任务</a>
-            <a className={styles.mobileNavActive} href="/search">
-              搜索
-            </a>
-            <a href="/review">回顾</a>
-          </div>
           <button aria-label="退出登录" onClick={logout} type="button">
             <LogOut aria-hidden="true" size={18} />
           </button>
         </header>
+
+        <MobileNavigation active="search" />
 
         <div className={styles.contentColumn}>
           <div className={styles.pageHeader}>

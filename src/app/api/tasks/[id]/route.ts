@@ -5,7 +5,11 @@ import {
   authorizeApiRequest,
   authorizeMutationOrigin,
 } from "@/lib/api";
-import { softDeleteTask, updateTask } from "@/lib/db";
+import {
+  createNextRecurringTask,
+  softDeleteTask,
+  updateTask,
+} from "@/lib/db";
 import { updateTaskSchema } from "@/lib/validation";
 
 type RouteContext = {
@@ -43,9 +47,13 @@ export async function PATCH(
   }
 
   const task = await updateTask(id, parsed.data);
-  return task
-    ? NextResponse.json({ task })
-    : apiError("未找到该任务", 404);
+  if (!task) return apiError("未找到该任务", 404);
+
+  const nextTask =
+    parsed.data.status === "done" && task.recurrenceRule !== "none"
+      ? await createNextRecurringTask(task.id)
+      : null;
+  return NextResponse.json({ task, nextTask });
 }
 
 export async function DELETE(

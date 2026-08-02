@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Shinian",
     short_name: "Shinian",
-    description: "自托管的卡片笔记与轻量任务系统",
+    description: "基于 Vercel 与 Neon 的个人卡片笔记与轻量任务系统",
     start_url: "/",
     display: "standalone",
     background_color: "#f4f0e7",

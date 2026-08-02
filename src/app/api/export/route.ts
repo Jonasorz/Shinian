@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError, authorizeApiRequest } from "@/lib/api";
-import { listMemos, listTasks } from "@/lib/db";
+import {
+  listAllMemos,
+  listAllTasks,
+  listStoredMemoAttachments,
+} from "@/lib/db";
 import { createObsidianExportZip, generateFullJsonExport } from "@/lib/export";
+import { readAttachmentFile } from "@/lib/attachments";
+
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await authorizeApiRequest())) {
@@ -11,9 +18,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   const format = searchParams.get("format") ?? "markdown";
 
-  const [memos, tasks] = await Promise.all([
-    listMemos(),
-    listTasks({ view: "all" }),
+  const [memos, tasks, storedAttachments] = await Promise.all([
+    listAllMemos(),
+    listAllTasks(),
+    listStoredMemoAttachments(),
   ]);
 
   const dateStr = new Date().toISOString().split("T")[0]!.replace(/-/g, "");
@@ -30,7 +38,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // Default: ZIP with Obsidian Vault Markdown
-  const zipBuffer = createObsidianExportZip(memos, tasks);
+  const attachmentFiles = await Promise.all(
+    storedAttachments.map(async (attachment) => ({
+      path: `${attachment.id}_${attachment.filename.replace(/[/\\?%*:|"<>]/g, "_")}`,
+      bytes: new Uint8Array(await readAttachmentFile(attachment.storageKey)),
+    })),
+  );
+  const zipBuffer = createObsidianExportZip(memos, tasks, attachmentFiles);
   return new NextResponse(Buffer.from(zipBuffer), {
     status: 200,
     headers: {

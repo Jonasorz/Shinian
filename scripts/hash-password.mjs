@@ -8,5 +8,5 @@ if (!password || password.length < 12) {
   process.exit(1);
 }
 
-console.log(await hash(password, 12));
-
+const passwordHash = await hash(password, 12);
+console.log(Buffer.from(passwordHash, "utf8").toString("base64"));

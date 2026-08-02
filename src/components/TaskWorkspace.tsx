@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SidebarTagTree } from "./SidebarTagTree";
+import { MobileNavigation } from "./MobileNavigation";
 import {
   Bell,
   Calendar,
@@ -136,42 +137,6 @@ function formatReminderLabel(reminderStr: string | null): string {
   return `提醒：${d.getMonth() + 1}月${d.getDate()}日 ${timeStr}`;
 }
 
-async function triggerMacosNotification(title: string, body: string) {
-  if (typeof window === "undefined" || !("Notification" in window)) return false;
-  if (Notification.permission !== "granted") return false;
-
-  const options: NotificationOptions = {
-    body,
-    icon: "/icon-192.png",
-    tag: `shinian-task-${Date.now()}`,
-  };
-
-  // 1. Try Service Worker ready (delivers macOS Notification Center popup)
-  if ("serviceWorker" in navigator) {
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      if (reg && reg.showNotification) {
-        await reg.showNotification(title, options);
-        return true;
-      }
-    } catch {
-      // Fallback
-    }
-  }
-
-  // 2. Fallback Web Notification API
-  try {
-    const notif = new Notification(title, options);
-    notif.onclick = () => {
-      window.focus();
-      window.location.href = "/tasks";
-    };
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function TaskWorkspace({
   initialTasks,
   initialLists,
@@ -214,6 +179,7 @@ export function TaskWorkspace({
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [undoState, setUndoState] = useState<UndoState | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notifiedReminderKeysRef = useRef(new Set<string>());
 
   // Memo creation prompt state
   const [memoNotice, setMemoNotice] = useState<{
@@ -221,60 +187,29 @@ export function TaskWorkspace({
     taskId: string;
   } | null>(null);
 
-  const [notificationPermission, setNotificationPermission] = useState<
-    "granted" | "denied" | "default" | "unsupported"
-  >("default");
-
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (typeof window !== "undefined" && "Notification" in window) {
-        setNotificationPermission(Notification.permission);
-      } else if (typeof window !== "undefined") {
-        setNotificationPermission("unsupported");
-      }
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  async function requestNotificationPermission() {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    try {
-      const res = await Notification.requestPermission();
-      setNotificationPermission(res);
-      if (res === "granted") {
-        setNotice("🎉 macOS 浏览器系统通知权限已开启！");
-        await triggerMacosNotification(
-          "拾年 - 系统通知已成功开启",
-          "任务到期时，将在 macOS 桌面右上角主动弹窗提醒。",
-        );
-        setTimeout(() => setNotice(""), 2500);
-      } else if (res === "denied") {
-        setNotice("系统通知权限被拒绝，请在 macOS 偏好设置 / 浏览器设置中允许通知");
-      }
-    } catch {
-      setNotice("无法开启通知权限");
-    }
-  }
-
-  useEffect(() => {
-    const notifiedIds = new Set<string>();
-    const timer = setInterval(() => {
+    const checkReminders = () => {
       const now = Date.now();
       for (const t of tasks) {
         if (t.status === "done" || t.status === "cancelled") continue;
         if (!t.reminderAt) continue;
         const remTime = new Date(t.reminderAt).getTime();
         if (isNaN(remTime)) continue;
-        if (Math.abs(now - remTime) <= 60000 && !notifiedIds.has(t.id)) {
-          notifiedIds.add(t.id);
+        const reminderKey = `${t.id}:${t.reminderAt}`;
+        if (
+          remTime <= now &&
+          now - remTime <= 24 * 60 * 60 * 1000 &&
+          !notifiedReminderKeysRef.current.has(reminderKey)
+        ) {
+          notifiedReminderKeysRef.current.add(reminderKey);
           setNotice(`🔔 提醒到期：${t.title}`);
-          void triggerMacosNotification(
-            "拾年 - 任务提醒",
-            `【${t.title}】到期提醒`,
-          );
+          window.setTimeout(() => setNotice(""), 10000);
         }
       }
-    }, 15000);
+    };
+
+    checkReminders();
+    const timer = setInterval(checkReminders, 15000);
 
     return () => clearInterval(timer);
   }, [tasks]);
@@ -441,17 +376,24 @@ export function TaskWorkspace({
 
     setBusyTaskId(task.id);
     try {
-      const data = await apiRequest<{ task: Task }>(`/api/tasks/${task.id}`, {
+      const data = await apiRequest<{ task: Task; nextTask?: Task | null }>(`/api/tasks/${task.id}`, {
         method: "PATCH",
         body: JSON.stringify({ status: newStatus }),
       });
 
-      setTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? data.task : t)),
-      );
+      setTasks((prev) => {
+        const updated = prev.map((t) => (t.id === task.id ? data.task : t));
+        return data.nextTask && !updated.some((t) => t.id === data.nextTask?.id)
+          ? [data.nextTask, ...updated]
+          : updated;
+      });
 
       if (!isCurrentlyDone) {
         setMemoNotice({ taskTitle: task.title, taskId: task.id });
+        if (data.nextTask) {
+          setNotice("任务已完成，并已生成下一次重复任务");
+          setTimeout(() => setNotice(""), 2200);
+        }
       }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "状态更新失败");
@@ -625,19 +567,12 @@ export function TaskWorkspace({
             </div>
             <span>Shinian</span>
           </div>
-          <div className={styles.mobileNav}>
-            <a href="/notes">记录</a>
-            <a className={styles.mobileNavActive} href="/tasks">
-              任务
-            </a>
-            <a href="/search">搜索</a>
-            <a href="/review">回顾</a>
-            <a href="/settings">设置</a>
-          </div>
           <button aria-label="退出登录" onClick={logout} type="button">
             <LogOut aria-hidden="true" size={18} />
           </button>
         </header>
+
+        <MobileNavigation active="tasks" />
 
         <div className={styles.contentColumn}>
           <div className={styles.pageHeader}>
@@ -646,27 +581,6 @@ export function TaskWorkspace({
               <h1>轻量任务管理</h1>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              {notificationPermission !== "unsupported" ? (
-                <button
-                  className={styles.tabButton}
-                  onClick={requestNotificationPermission}
-                  style={{
-                    background:
-                      notificationPermission === "granted"
-                        ? "var(--surface-quiet)"
-                        : "var(--accent-soft)",
-                    borderColor: "var(--accent)",
-                    color: "var(--accent-strong)",
-                  }}
-                  title="点击开启或测试 macOS 桌面系统通知"
-                  type="button"
-                >
-                  <Bell size={14} />
-                  {notificationPermission === "granted"
-                    ? "测试 macOS 桌面通知"
-                    : "开启 macOS 桌面通知"}
-                </button>
-              ) : null}
               {notice ? (
                 <span className={styles.notice} aria-live="polite">
                   {notice}
@@ -769,120 +683,6 @@ export function TaskWorkspace({
                 </button>
               ))}
           </div>
-
-          {/* macOS System Notification Diagnostic Box for Denied State */}
-          {notificationPermission === "denied" ? (
-            <div
-              style={{
-                marginBottom: "20px",
-                padding: "14px 18px",
-                borderRadius: "var(--radius-surface)",
-                background: "var(--danger-soft)",
-                border: "1px solid var(--danger)",
-                color: "var(--ink)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "8px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    fontWeight: 600,
-                    color: "var(--danger)",
-                  }}
-                >
-                  <Bell size={16} />
-                  <span>macOS / 浏览器通知被拦截排查指南：</span>
-                </div>
-                <button
-                  onClick={requestNotificationPermission}
-                  style={{
-                    padding: "4px 10px",
-                    borderRadius: "6px",
-                    border: "1px solid var(--danger)",
-                    background: "var(--surface)",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                  }}
-                  type="button"
-                >
-                  重新检测权限
-                </button>
-              </div>
-              <ol
-                style={{
-                  margin: 0,
-                  paddingLeft: "20px",
-                  fontSize: "13px",
-                  color: "var(--ink-soft)",
-                  lineHeight: "1.6",
-                }}
-              >
-                <li>
-                  <strong>Chrome 网站权限允许</strong>：点击 Chrome 地址栏最左侧的 🔒 图标/图标 ➔【网站设置】➔ 将【通知】设为“允许”（或点击“重置权限”后刷新页面）。
-                </li>
-                <li>
-                  <strong>macOS 系统设置开关</strong>：打开 macOS【系统设置】➔【通知】➔ 找到【Google Chrome】并确保开关为【允许通知】。
-                </li>
-                <li>
-                  <strong>关闭勿扰模式</strong>：检查 macOS 右上角控制中心，确保【勿扰模式 / 专注模式】未处于开启状态。
-                </li>
-              </ol>
-            </div>
-          ) : null}
-
-          {/* macOS System Notification Permission Banner for Default State */}
-          {notificationPermission === "default" ? (
-            <div
-              style={{
-                marginBottom: "20px",
-                padding: "10px 16px",
-                borderRadius: "var(--radius-control)",
-                background: "var(--surface-quiet)",
-                border: "1px solid var(--divider)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "12px",
-              }}
-            >
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "8px" }}
-              >
-                <Bell size={16} style={{ color: "var(--accent-strong)" }} />
-                <span style={{ fontSize: "13px", color: "var(--ink-soft)" }}>
-                  允许浏览器通知，可在 macOS 桌面右上角接收任务到期提醒
-                </span>
-              </div>
-              <button
-                onClick={requestNotificationPermission}
-                style={{
-                  padding: "5px 12px",
-                  borderRadius: "6px",
-                  background: "var(--accent)",
-                  color: "white",
-                  border: "none",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-                type="button"
-              >
-                开启 macOS 桌面通知
-              </button>
-            </div>
-          ) : null}
 
           {/* New Task Composer Card */}
           <form className={styles.composerCard} onSubmit={handleCreateTask}>
@@ -999,6 +799,11 @@ export function TaskWorkspace({
               </button>
             </div>
           </form>
+
+          <p className={styles.reminderHint}>
+            <Bell aria-hidden="true" size={13} />
+            当前网页版提醒仅在任务页面保持打开时显示
+          </p>
 
           {/* Reflection Memo Toast Prompt */}
           {memoNotice ? (

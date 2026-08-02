@@ -154,6 +154,15 @@
   max-width: 760px;
 }
 
+.reminderHint {
+  display: flex;
+  margin: -8px 2px 20px;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
 .pageHeader {
   display: flex;
   align-items: flex-end;

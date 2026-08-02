@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     default: "Shinian",
     template: "%s · Shinian",
   },
-  description: "自托管的卡片笔记与轻量任务系统",
+  description: "基于 Vercel 与 Neon 的个人卡片笔记与轻量任务系统",
   applicationName: "Shinian",
   appleWebApp: {
     capable: true,

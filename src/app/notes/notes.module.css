@@ -254,6 +254,35 @@
   font-size: 11px;
 }
 
+.composerControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.imagePicker {
+  display: inline-flex;
+  min-height: 40px;
+  padding: 0 10px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-control);
+  background: var(--surface-quiet);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.imagePicker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .errorText {
   color: var(--danger);
   font-weight: 500;
@@ -410,6 +439,22 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   text-wrap: pretty;
+}
+
+.attachmentGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.attachmentGrid img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+  border-radius: 10px;
+  object-fit: cover;
 }
 
 .inlineTag {

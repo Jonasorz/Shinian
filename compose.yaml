@@ -16,19 +16,5 @@ services:
       timeout: 5s
       retries: 12
 
-  app:
-    image: ghcr.io/jonasorz/shinian:latest
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgres://shinian:${POSTGRES_PASSWORD}@db:5432/shinian
-      SHINIAN_USERNAME: ${SHINIAN_USERNAME}
-      SHINIAN_PASSWORD_HASH_B64: ${SHINIAN_PASSWORD_HASH_B64}
-      AUTH_SECRET: ${AUTH_SECRET}
-    ports:
-      - "127.0.0.1:${SHINIAN_PORT:-3210}:3000"
-
 volumes:
   shinian_postgres:

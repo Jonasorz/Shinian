@@ -10,13 +10,16 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { SidebarTagTree } from "./SidebarTagTree";
+import { MobileNavigation } from "./MobileNavigation";
 import {
   Check,
   CheckSquare,
   Feather,
   LogOut,
   PencilLine,
+  ImagePlus,
   Search,
   Send,
   Settings,
@@ -25,7 +28,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import type { Memo } from "@/lib/types";
+import type { Memo, MemoAttachment } from "@/lib/types";
 import styles from "@/app/notes/notes.module.css";
 
 const DRAFT_KEY = "shinian.memo.draft";
@@ -227,6 +230,7 @@ export function MemoWorkspace({
   const [draft, setDraft] = useState("");
   const [composerError, setComposerError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(
@@ -312,6 +316,7 @@ export function MemoWorkspace({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       deletedAt: null,
+      attachments: [],
     };
 
     // Optimistic UI update: instantly insert to list & clear draft for 0ms lag
@@ -333,6 +338,35 @@ export function MemoWorkspace({
         sortMemos(current.map((m) => (m.id === tempId ? data.memo : m))),
       );
 
+      const uploadedAttachments: MemoAttachment[] = [];
+      let uploadFailed = false;
+      for (const image of pendingImages) {
+        const formData = new FormData();
+        formData.append("file", image);
+        const uploadResponse = await fetch(`/api/memos/${data.memo.id}/attachments`, {
+          method: "POST",
+          body: formData,
+        });
+        if (!uploadResponse.ok) {
+          uploadFailed = true;
+          continue;
+        }
+        const result = (await uploadResponse.json()) as {
+          attachment: MemoAttachment;
+        };
+        uploadedAttachments.push(result.attachment);
+      }
+      if (uploadedAttachments.length > 0) {
+        setMemos((current) =>
+          current.map((memo) =>
+            memo.id === data.memo.id
+              ? { ...memo, attachments: uploadedAttachments }
+              : memo,
+          ),
+        );
+      }
+      setPendingImages([]);
+
       // Auto convert to task if #任务 or - [ ] or todo intent is present
       if (isTaskIntent) {
         const { title, description } = extractTaskTitleAndDesc(content);
@@ -345,12 +379,16 @@ export function MemoWorkspace({
               sourceMemoId: data.memo.id,
             }),
           });
-          setNotice("已记下笔记，并已自动同步生成对应任务！");
+          setNotice(
+            uploadFailed
+              ? "笔记和任务已保存，部分图片上传失败"
+              : "已记下笔记，并已自动同步生成对应任务！",
+          );
         } catch {
           setNotice("笔记已保存（自动同步任务失败）");
         }
       } else {
-        setNotice("已记下");
+        setNotice(uploadFailed ? "笔记已保存，部分图片上传失败" : "已记下");
       }
       window.setTimeout(() => setNotice(""), 1800);
       composerRef.current?.focus();
@@ -546,6 +584,8 @@ export function MemoWorkspace({
           </button>
         </header>
 
+        <MobileNavigation active="notes" />
+
         <div className={styles.contentColumn}>
           <section className={styles.composerSection} aria-label="快速记录">
             <div className={styles.composerHeading}>
@@ -613,13 +653,29 @@ export function MemoWorkspace({
                       </span>
                     ) : null}
                   </div>
-                  <button
-                    disabled={isCreating || !draft.trim()}
-                    type="submit"
-                  >
-                    <span>{isCreating ? "保存中" : "记下"}</span>
-                    <Send aria-hidden="true" size={16} strokeWidth={1.8} />
-                  </button>
+                  <div className={styles.composerControls}>
+                    <label className={styles.imagePicker}>
+                      <ImagePlus aria-hidden="true" size={17} />
+                      <span>{pendingImages.length ? `${pendingImages.length} 张` : "图片"}</span>
+                      <input
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        multiple
+                        onChange={(event) => {
+                          const images = Array.from(event.target.files ?? []).slice(0, 4);
+                          setPendingImages(images);
+                          event.target.value = "";
+                        }}
+                        type="file"
+                      />
+                    </label>
+                    <button
+                      disabled={isCreating || !draft.trim()}
+                      type="submit"
+                    >
+                      <span>{isCreating ? "保存中" : "记下"}</span>
+                      <Send aria-hidden="true" size={16} strokeWidth={1.8} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </form>
@@ -720,6 +776,26 @@ export function MemoWorkspace({
                                 <div className={styles.memoContent}>
                                   <MemoContent content={memo.content} />
                                 </div>
+                                {memo.attachments.length > 0 ? (
+                                  <div className={styles.attachmentGrid}>
+                                    {memo.attachments.map((attachment) => (
+                                      <a
+                                        href={attachment.url}
+                                        key={attachment.id}
+                                        rel="noreferrer"
+                                        target="_blank"
+                                      >
+                                        <Image
+                                          alt={attachment.filename}
+                                          height={480}
+                                          src={attachment.url}
+                                          unoptimized
+                                          width={640}
+                                        />
+                                      </a>
+                                    ))}
+                                  </div>
+                                ) : null}
 
                                 {isConfirmingDelete ? (
                                   <div className={styles.deleteConfirm}>

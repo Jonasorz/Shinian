@@ -25,7 +25,14 @@ export function generateMemoMarkdown(memo: Memo): string {
   yamlLines.push('source: "shinian"');
   yamlLines.push("---", "");
 
-  return `${yamlLines.join("\n")}${memo.content}\n`;
+  const attachmentLines = memo.attachments.map((attachment) => {
+    const safeName = attachment.filename.replace(/[/\\?%*:|"<>]/g, "_");
+    return `![[Attachments/${attachment.id}_${safeName}]]`;
+  });
+  const attachments = attachmentLines.length
+    ? `\n\n${attachmentLines.join("\n")}`
+    : "";
+  return `${yamlLines.join("\n")}${memo.content}${attachments}\n`;
 }
 
 /**
@@ -92,7 +99,16 @@ export function generateFullJsonExport(memos: Memo[], tasks: Task[]): string {
 /**
  * Build a ZIP file containing the Obsidian Markdown vault structure and full JSON backup.
  */
-export function createObsidianExportZip(memos: Memo[], tasks: Task[]): Uint8Array {
+export type ExportAttachmentFile = {
+  path: string;
+  bytes: Uint8Array;
+};
+
+export function createObsidianExportZip(
+  memos: Memo[],
+  tasks: Task[],
+  attachmentFiles: ExportAttachmentFile[] = [],
+): Uint8Array {
   const files: Record<string, Uint8Array> = {};
 
   // 1. Pack Memos into Memos/ directory
@@ -120,6 +136,10 @@ export function createObsidianExportZip(memos: Memo[], tasks: Task[]): Uint8Arra
 
   // 3. Include full JSON backup
   files["shinian_backup.json"] = strToU8(generateFullJsonExport(memos, tasks));
+
+  for (const attachment of attachmentFiles) {
+    files[`Attachments/${attachment.path}`] = attachment.bytes;
+  }
 
   return zipSync(files, { level: 6 });
 }
