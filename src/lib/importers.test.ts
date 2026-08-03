@@ -25,6 +25,33 @@ describe("flomo HTML importer", () => {
     expect(result.previewStats.tagsFound).toContain("#TypeScript");
     expect(result.previewStats.tagsFound).toContain("#架构");
   });
+
+  it("maps image paths from a flomo export folder to their memo", () => {
+    const html = `
+      <div class="memo">
+        <div class="time">2026-05-21 20:52:20</div>
+        <div class="content"><p>带图片的记录 #日记</p></div>
+        <div class="files">
+          <img src="file/2026-05-21/1212755/photo%201.jpg" alt="memo image" />
+          <img src="file/2026-05-21/1212755/photo2.png" alt="memo image" />
+        </div>
+      </div>
+      <div class="memo">
+        <div class="time">2026-05-22 10:00:00</div>
+        <div class="content"><p>下一条记录</p></div>
+        <div class="files"></div>
+      </div>
+    `;
+
+    const result = parseFlomoHtml(html);
+    expect(result.memos).toHaveLength(2);
+    expect(result.memos[0]!.attachmentPaths).toEqual([
+      "file/2026-05-21/1212755/photo 1.jpg",
+      "file/2026-05-21/1212755/photo2.png",
+    ]);
+    expect(result.memos[1]!.attachmentPaths).toEqual([]);
+    expect(result.previewStats.attachmentCount).toBe(2);
+  });
 });
 
 describe("TickTick CSV importer", () => {

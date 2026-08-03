@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import postgres from "postgres";
+import { listMigrationFiles } from "./migration-files.mjs";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -21,13 +22,7 @@ try {
   `;
 
   const migrationsDirectory = path.join(process.cwd(), "db", "migrations");
-  const filenames = [
-    "001_init.sql",
-    "002_tasks.sql",
-    "003_import_batches.sql",
-    "004_notifications_recurrence.sql",
-    "005_attachments.sql",
-  ];
+  const filenames = await listMigrationFiles(migrationsDirectory);
 
   for (const filename of filenames) {
     const [existing] = await sql`

@@ -2,13 +2,32 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_IMAGE_BYTES,
   attachmentUploadMetadataSchema,
+  attachmentUploadMode,
   isAttachmentPathForMemo,
   isAttachmentThumbnailPathForMemo,
+  isLocalAttachmentStorageKey,
+  toLocalAttachmentStorageKey,
 } from "./attachment-upload";
 
 const memoId = "2ed64279-7bbd-4c92-ae29-fd129a0ec927";
 
 describe("attachment client upload validation", () => {
+  it("uses local files in development and Blob in production", () => {
+    expect(attachmentUploadMode("development")).toBe("local");
+    expect(attachmentUploadMode("test")).toBe("local");
+    expect(attachmentUploadMode("production")).toBe("blob");
+  });
+
+  it("marks local storage keys without changing their validated pathname", () => {
+    const pathname =
+      `attachments/${memoId}/0d04dcd9-7cea-4335-83cf-430616c2ea44.jpg`;
+    const storageKey = toLocalAttachmentStorageKey(pathname);
+
+    expect(storageKey).toBe(`local:${pathname}`);
+    expect(isLocalAttachmentStorageKey(storageKey)).toBe(true);
+    expect(isLocalAttachmentStorageKey(pathname)).toBe(false);
+  });
+
   it("accepts a supported image within the product limit", () => {
     const parsed = attachmentUploadMetadataSchema.safeParse({
       memoId,

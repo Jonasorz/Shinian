@@ -83,6 +83,8 @@ npm run dev
 ```
 在浏览器中打开 `http://localhost:3210`，使用账号 `owner` 及刚才配置的密码登录。
 
+开发环境的图片保存在仓库外部管理的 `uploads/` 运行目录中，不需要配置 Vercel Blob 凭据；生产构建仍使用 Private Vercel Blob。`uploads/` 已被 Git 忽略，测试和迁移前请按需单独备份。
+
 ### 常用检查命令
 ```bash
 npm run lint    # 代码规范检查
@@ -104,7 +106,7 @@ npm run build   # 构建测试
    - `BLOB_READ_WRITE_TOKEN`（连接 Blob Store 后通常自动注入）
    - `BACKUP_RETENTION_DAYS`（默认 30）
 
-4. 部署时构建脚本会对 Neon 自动执行幂等数据库迁移。
+4. 部署时构建脚本会自动发现 `db/migrations/` 下的有序 SQL 文件，并对 Neon 执行幂等数据库迁移。
 5. 部署完成后，在 PC 浏览器验证页面内提醒，并上传一张测试图片。
 
 `vercel.json` 只配置每日完整归档，符合 Vercel Hobby 的 Cron 限制。任务提醒不依赖 Vercel Cron。

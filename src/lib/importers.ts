@@ -3,6 +3,7 @@ import type { TaskPriority, TaskStatus } from "./types";
 export type ParsedMemoItem = {
   content: string;
   createdAt?: string;
+  attachmentPaths?: string[];
 };
 
 export type ParsedTaskItem = {
@@ -21,6 +22,7 @@ export type ImportParseResult = {
   previewStats: {
     memoCount: number;
     taskCount: number;
+    attachmentCount: number;
     tagsFound: string[];
     listsFound: string[];
   };
@@ -34,7 +36,15 @@ export function parseFlomoHtml(htmlContent: string): ImportParseResult {
 
   // Match memo cards in flomo HTML format
   // Typical flomo format: <div class="memo"><div class="time">2023-05-20 14:30:00</div><div class="content"><p>text</p></div></div>
-  const memoBlocks = htmlContent.match(/<div class=["']memo["'][\s\S]*?<\/div>\s*<\/div>/gi) || [];
+  const memoStarts = Array.from(
+    htmlContent.matchAll(/<div\s+[^>]*class=["'][^"']*\bmemo\b[^"']*["'][^>]*>/gi),
+  );
+  const memoBlocks = memoStarts.map((match, index) =>
+    htmlContent.slice(
+      match.index,
+      memoStarts[index + 1]?.index ?? htmlContent.length,
+    ),
+  );
 
   if (memoBlocks.length === 0) {
     // Generic fallback: match paragraphs or text blocks containing #tags
@@ -53,6 +63,10 @@ export function parseFlomoHtml(htmlContent: string): ImportParseResult {
       const timeStr = timeMatch ? stripHtmlTags(timeMatch[1]!).trim() : undefined;
       const rawContent = contentMatch ? contentMatch[1]! : block;
       const cleanContent = formatHtmlContentToText(rawContent).trim();
+      const attachmentPaths = Array.from(
+        block.matchAll(/<img\s+[^>]*src=["']([^"']+)["'][^>]*>/gi),
+        (match) => normalizeFlomoAttachmentPath(match[1]!),
+      ).filter((path): path is string => Boolean(path));
 
       if (cleanContent) {
         let createdAt: string | undefined = undefined;
@@ -66,6 +80,7 @@ export function parseFlomoHtml(htmlContent: string): ImportParseResult {
         memos.push({
           content: cleanContent,
           createdAt,
+          attachmentPaths,
         });
       }
     });
@@ -85,10 +100,27 @@ export function parseFlomoHtml(htmlContent: string): ImportParseResult {
     previewStats: {
       memoCount: memos.length,
       taskCount: 0,
+      attachmentCount: memos.reduce(
+        (count, memo) => count + (memo.attachmentPaths?.length ?? 0),
+        0,
+      ),
       tagsFound: Array.from(tagsSet),
       listsFound: [],
     },
   };
+}
+
+function normalizeFlomoAttachmentPath(source: string): string | null {
+  const decoded = (() => {
+    try {
+      return decodeURIComponent(source);
+    } catch {
+      return source;
+    }
+  })();
+  const normalized = decoded.replace(/\\/g, "/").replace(/^\.\//, "");
+  if (!normalized.startsWith("file/") || normalized.includes("../")) return null;
+  return normalized;
 }
 
 /**
@@ -123,7 +155,7 @@ export function parseTickTickCsv(csvContent: string): ImportParseResult {
       source: "ticktick",
       memos: [],
       tasks: [],
-      previewStats: { memoCount: 0, taskCount: 0, tagsFound: [], listsFound: [] },
+      previewStats: { memoCount: 0, taskCount: 0, attachmentCount: 0, tagsFound: [], listsFound: [] },
     };
   }
 
@@ -190,6 +222,7 @@ export function parseTickTickCsv(csvContent: string): ImportParseResult {
     previewStats: {
       memoCount: 0,
       taskCount: tasks.length,
+      attachmentCount: 0,
       tagsFound: [],
       listsFound: Array.from(listsSet),
     },
@@ -302,6 +335,7 @@ export function parseShinianJson(jsonContent: string): ImportParseResult {
     previewStats: {
       memoCount: memos.length,
       taskCount: tasks.length,
+      attachmentCount: 0,
       tagsFound: Array.from(tagsSet),
       listsFound: Array.from(listsSet),
     },

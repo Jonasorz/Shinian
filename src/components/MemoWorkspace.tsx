@@ -35,7 +35,12 @@ import {
   MAX_IMAGE_BYTES,
   extensionForContentType,
 } from "@/lib/attachment-constants";
+import { attachmentUploadMode } from "@/lib/attachment-upload";
 import { createImageThumbnail } from "@/lib/image-thumbnail";
+import {
+  canSubmitMemo,
+  memoContentForSubmission,
+} from "@/lib/memo-composer";
 import styles from "@/app/notes/notes.module.css";
 
 const DRAFT_KEY = "shinian.memo.draft";
@@ -55,6 +60,7 @@ type RetryImage = {
   file: File;
   pathname?: string;
   thumbnailPathname?: string;
+  error?: string;
 };
 
 type RetryUploadBatch = {
@@ -355,6 +361,28 @@ export function MemoWorkspace({
     for (const [index, item] of items.entries()) {
       let retryItem = item;
       try {
+        if (attachmentUploadMode() === "local") {
+          const formData = new FormData();
+          formData.set("file", item.file);
+          const thumbnail = await createImageThumbnail(item.file);
+          if (thumbnail) formData.set("thumbnail", thumbnail);
+
+          const response = await fetch(`/api/memos/${memoId}/attachments`, {
+            method: "POST",
+            body: formData,
+          });
+          const result = (await response.json()) as {
+            attachment?: MemoAttachment;
+            error?: string;
+          };
+          if (!response.ok || !result.attachment) {
+            throw new Error(result.error ?? "本地图片保存失败");
+          }
+          attachments.push(result.attachment);
+          setUploadProgress(Math.round(((index + 1) / items.length) * 100));
+          continue;
+        }
+
         let pathname = item.pathname;
         if (!pathname) {
           const extension = extensionForContentType(item.file.type);
@@ -432,8 +460,11 @@ export function MemoWorkspace({
         }
         attachments.push(result.attachment);
         setUploadProgress(Math.round(((index + 1) / items.length) * 100));
-      } catch {
-        failed.push(retryItem);
+      } catch (error) {
+        failed.push({
+          ...retryItem,
+          error: error instanceof Error ? error.message : "图片上传失败",
+        });
       }
     }
     setUploadProgress(null);
@@ -487,10 +518,11 @@ export function MemoWorkspace({
   }
 
   async function createNewMemo() {
-    const content = draft.trim();
+    const draftContent = draft.trim();
+    const content = memoContentForSubmission(draftContent, pendingImages.length);
     setComposerError("");
-    if (!content) {
-      setComposerError("写点什么再保存");
+    if (!canSubmitMemo(content, pendingImages.length)) {
+      setComposerError("写点什么或选择图片再保存");
       composerRef.current?.focus();
       return;
     }
@@ -572,7 +604,7 @@ export function MemoWorkspace({
     } catch (error) {
       // Revert optimistic memo on error
       setMemos((current) => current.filter((m) => m.id !== tempId));
-      setDraft(content);
+      setDraft(draftContent);
       setComposerError(
         error instanceof Error ? error.message : "暂时无法保存",
       );
@@ -857,7 +889,9 @@ export function MemoWorkspace({
                       />
                     </label>
                     <button
-                      disabled={isCreating || !draft.trim()}
+                      disabled={
+                        isCreating || !canSubmitMemo(draft, pendingImages.length)
+                      }
                       type="submit"
                     >
                       <span>
@@ -879,7 +913,10 @@ export function MemoWorkspace({
                 <AlertTriangle aria-hidden="true" size={18} />
                 <div>
                   <strong>{batch.items.length} 张图片尚未保存</strong>
-                  <span>笔记正文已保存，图片仍保留在当前页面，可立即重试。</span>
+                  <span>
+                    {batch.items[0]?.error ??
+                      "笔记正文已保存，图片仍保留在当前页面，可立即重试。"}
+                  </span>
                 </div>
                 <button
                   disabled={retryingMemoId === batch.memoId}

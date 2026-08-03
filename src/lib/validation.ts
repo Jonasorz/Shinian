@@ -70,4 +70,3 @@ export const updateTaskSchema = z.object({
     .optional(),
   restore: z.boolean().optional(),
 });
-

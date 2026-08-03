@@ -52,4 +52,3 @@ describe("task validation", () => {
     expect(result.priority).toBe("high");
   });
 });
-

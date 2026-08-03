@@ -433,14 +433,26 @@ export async function listAllTasks(): Promise<Task[]> {
 }
 
 export async function listTaskLists(): Promise<string[]> {
-  const rows = await database()<Array<{ list_name: string }>>`
-    SELECT DISTINCT list_name
-    FROM tasks
-    WHERE deleted_at IS NULL
-    ORDER BY list_name ASC
+  const rows = await database()<Array<{ name: string }>>`
+    SELECT name
+    FROM (
+      SELECT name FROM task_lists
+      UNION
+      SELECT list_name AS name FROM tasks WHERE deleted_at IS NULL
+    ) AS available_lists
+    ORDER BY CASE WHEN name = '收件箱' THEN 0 ELSE 1 END, name ASC
   `;
-  const set = new Set(["收件箱", ...rows.map((r) => r.list_name)]);
-  return Array.from(set);
+  return rows.map((row) => row.name);
+}
+
+export async function createTaskList(name: string): Promise<string> {
+  const normalizedName = name.trim();
+  await database()`
+    INSERT INTO task_lists (name)
+    VALUES (${normalizedName})
+    ON CONFLICT (name) DO NOTHING
+  `;
+  return normalizedName;
 }
 
 export async function createTask(input: {
@@ -828,9 +840,10 @@ export async function createImportBatch(params: {
     priority?: TaskPriority;
     status?: TaskStatus;
   }>;
-}): Promise<ImportBatch> {
+}): Promise<{ batch: ImportBatch; memoIds: string[] }> {
   const sql = database();
   const batchId = crypto.randomUUID();
+  const memoIds: string[] = [];
 
   const [batchRow] = await sql<ImportBatchRow[]>`
     INSERT INTO import_batches (id, source, memo_count, task_count)
@@ -841,6 +854,7 @@ export async function createImportBatch(params: {
   // Bulk insert Memos
   for (const m of params.memos) {
     const memoId = crypto.randomUUID();
+    memoIds.push(memoId);
     const createdAt = m.createdAt ? new Date(m.createdAt) : new Date();
     await sql`
       INSERT INTO memos (id, content, created_at, import_batch_id)
@@ -867,11 +881,14 @@ export async function createImportBatch(params: {
   }
 
   return {
-    id: batchRow.id,
-    source: batchRow.source,
-    memoCount: batchRow.memo_count,
-    taskCount: batchRow.task_count,
-    createdAt: batchRow.created_at.toISOString(),
+    batch: {
+      id: batchRow.id,
+      source: batchRow.source,
+      memoCount: batchRow.memo_count,
+      taskCount: batchRow.task_count,
+      createdAt: batchRow.created_at.toISOString(),
+    },
+    memoIds,
   };
 }
 

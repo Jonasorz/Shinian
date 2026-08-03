@@ -9,6 +9,7 @@ import {
   Calendar,
   Check,
   CheckSquare,
+  ChevronDown,
   Clock,
   Feather,
   Filter,
@@ -24,6 +25,7 @@ import {
   Sparkles,
   Trash2,
   Undo2,
+  X,
 } from "lucide-react";
 import type {
   RecurrenceRule,
@@ -136,6 +138,27 @@ function formatReminderLabel(reminderStr: string | null): string {
   return `提醒：${d.getMonth() + 1}月${d.getDate()}日 ${timeStr}`;
 }
 
+function toLocalDatetimeValue(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatComposerDateLabel(value: string): string {
+  if (!value) return "日期";
+
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return "日期";
+
+  const dateKey = formatDateKey(date.toISOString());
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (dateKey === formatDateKey(today.toISOString())) return "今天";
+  if (dateKey === formatDateKey(tomorrow.toISOString())) return "明天";
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
 export function TaskWorkspace({
   initialTasks,
   initialLists,
@@ -159,6 +182,11 @@ export function TaskWorkspace({
     useState<RecurrenceRule>("none");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const [isAddingList, setIsAddingList] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [isCreatingList, setIsCreatingList] = useState(false);
+  const composerRef = useRef<HTMLFormElement | null>(null);
 
   // Edit task state
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -179,6 +207,29 @@ export function TaskWorkspace({
   const [undoState, setUndoState] = useState<UndoState | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notifiedReminderKeysRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!isScheduleOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        composerRef.current &&
+        !composerRef.current.contains(event.target as Node)
+      ) {
+        setIsScheduleOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsScheduleOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isScheduleOpen]);
 
   // Memo creation prompt state
   const [memoNotice, setMemoNotice] = useState<{
@@ -337,6 +388,7 @@ export function TaskWorkspace({
     setDescription("");
     setDueDate("");
     setReminderAt("");
+    setIsScheduleOpen(false);
 
     setIsSubmitting(true);
     try {
@@ -508,6 +560,38 @@ export function TaskWorkspace({
     }
   }
 
+  function setQuickDueDate(daysFromToday: number) {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromToday);
+    date.setHours(23, 59, 0, 0);
+    setDueDate(toLocalDatetimeValue(date));
+  }
+
+  async function handleCreateList() {
+    const name = newListName.trim();
+    if (!name || isCreatingList) return;
+
+    setIsCreatingList(true);
+    try {
+      const data = await apiRequest<{ list: string }>("/api/task-lists", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      });
+      setLists((current) =>
+        current.includes(data.list) ? current : [...current, data.list],
+      );
+      setListName(data.list);
+      setNewListName("");
+      setIsAddingList(false);
+      setNotice(`已创建清单：${data.list}`);
+      setTimeout(() => setNotice(""), 1800);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "创建清单失败");
+    } finally {
+      setIsCreatingList(false);
+    }
+  }
+
   return (
     <div className={styles.shell}>
       {/* Sidebar for Desktop */}
@@ -663,138 +747,296 @@ export function TaskWorkspace({
               <span className={styles.tabCount}>{counts.all}</span>
             </button>
 
-            {/* Custom List Filter Options */}
-            {lists
-              .filter((l) => l !== "收件箱")
-              .map((l) => (
-                <button
-                  key={l}
-                  className={`${styles.tabButton} ${
-                    activeList === l ? styles.activeTab : ""
-                  }`}
-                  onClick={() => setActiveList(l)}
-                  type="button"
-                >
-                  <Filter size={14} />
-                  {l}
-                </button>
-              ))}
+            <label
+              className={`${styles.listFilterControl} ${
+                activeList ? styles.listFilterActive : ""
+              }`}
+            >
+              <Filter aria-hidden="true" size={14} />
+              <select
+                aria-label="按任务清单筛选"
+                onChange={(event) =>
+                  setActiveList(event.target.value || null)
+                }
+                value={activeList ?? ""}
+              >
+                <option value="">清单筛选</option>
+                {lists
+                  .filter((list) => list !== "收件箱")
+                  .map((list) => (
+                    <option key={list} value={list}>
+                      {list}
+                    </option>
+                  ))}
+              </select>
+              <ChevronDown aria-hidden="true" size={14} />
+            </label>
           </div>
 
           {/* New Task Composer Card */}
-          <form className={styles.composerCard} onSubmit={handleCreateTask}>
+          <form
+            className={styles.composerCard}
+            onSubmit={handleCreateTask}
+            ref={composerRef}
+          >
             <div className={styles.composerTitleRow}>
-              <Plus size={18} style={{ color: "var(--ink-muted)" }} />
+              <Plus
+                aria-hidden="true"
+                className={styles.composerPlus}
+                size={18}
+              />
               <input
                 className={styles.titleInput}
                 onChange={(e) => setTitle(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     void handleCreateTask(e);
                   }
                 }}
-                placeholder="准备做什么？(支持 Cmd+Enter 快速直接添加任务)"
+                placeholder="添加任务，按 Enter 保存"
                 type="text"
                 value={title}
               />
-            </div>
-
-            {title.trim() ? (
-              <textarea
-                className={styles.descriptionInput}
-                onChange={(e) => setDescription(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    void handleCreateTask(e);
-                  }
-                }}
-                placeholder="补充详细备注..."
-                value={description}
-              />
-            ) : null}
-
-            <div className={styles.composerMetaRow}>
-              <div className={styles.metaControls}>
-                {/* Priority */}
-                <div className={styles.selectControl}>
-                  <Flag size={13} />
-                  <select
-                    onChange={(e) =>
-                      setPriority(e.target.value as TaskPriority)
-                    }
-                    value={priority}
-                  >
-                    <option value="none">优先级：无</option>
-                    <option value="low">低</option>
-                    <option value="medium">中</option>
-                    <option value="high">高</option>
-                  </select>
-                </div>
-
-                {/* List */}
-                <div className={styles.selectControl}>
-                  <Inbox size={13} />
-                  <select
-                    onChange={(e) => setListName(e.target.value)}
-                    value={listName}
-                  >
-                    {lists.map((l) => (
-                      <option key={l} value={l}>
-                        清单：{l}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Due Date & Time */}
-                <div className={styles.dateControl} title="截止时间">
-                  <Calendar size={13} />
-                  <input
-                    onChange={(e) => setDueDate(e.target.value)}
-                    type="datetime-local"
-                    value={dueDate}
-                  />
-                </div>
-
-                {/* Reminder At */}
-                <div className={styles.dateControl} title="提醒时间">
-                  <Bell size={13} />
-                  <input
-                    onChange={(e) => setReminderAt(e.target.value)}
-                    type="datetime-local"
-                    value={reminderAt}
-                  />
-                </div>
-
-                {/* Recurrence */}
-                <div className={styles.selectControl}>
-                  <RotateCw size={13} />
-                  <select
-                    onChange={(e) =>
-                      setRecurrenceRule(e.target.value as RecurrenceRule)
-                    }
-                    value={recurrenceRule}
-                  >
-                    <option value="none">不重复</option>
-                    <option value="daily">每天</option>
-                    <option value="workday">工作日</option>
-                    <option value="weekly">每周</option>
-                    <option value="monthly">每月</option>
-                    <option value="yearly">每年</option>
-                  </select>
-                </div>
-              </div>
-
+              <button
+                aria-controls="task-schedule-panel"
+                aria-expanded={isScheduleOpen}
+                aria-haspopup="dialog"
+                className={`${styles.scheduleTrigger} ${dueDate ? styles.scheduleTriggerActive : ""}`}
+                onClick={() => setIsScheduleOpen((open) => !open)}
+                type="button"
+              >
+                <Calendar aria-hidden="true" size={15} />
+                <span>{formatComposerDateLabel(dueDate)}</span>
+                <ChevronDown aria-hidden="true" size={14} />
+              </button>
               <button
                 className={styles.submitTaskButton}
                 disabled={!title.trim() || isSubmitting}
                 type="submit"
               >
-                添加任务
+                添加
               </button>
             </div>
+
+            {isScheduleOpen ? (
+              <>
+                <button
+                  aria-label="关闭任务设置"
+                  className={styles.scheduleBackdrop}
+                  onClick={() => setIsScheduleOpen(false)}
+                  type="button"
+                />
+                <section
+                  aria-label="任务日期与高级设置"
+                  className={styles.schedulePanel}
+                  id="task-schedule-panel"
+                  role="dialog"
+                >
+                  <div className={styles.scheduleHeader}>
+                    <div>
+                      <strong>安排任务</strong>
+                      <span>日期与高级选项</span>
+                    </div>
+                    <button
+                      aria-label="关闭任务设置"
+                      className={styles.iconButton}
+                      onClick={() => setIsScheduleOpen(false)}
+                      type="button"
+                    >
+                      <X aria-hidden="true" size={17} />
+                    </button>
+                  </div>
+
+                  <div className={styles.quickDates}>
+                    <button onClick={() => setQuickDueDate(0)} type="button">
+                      今天
+                    </button>
+                    <button onClick={() => setQuickDueDate(1)} type="button">
+                      明天
+                    </button>
+                    <button onClick={() => setQuickDueDate(7)} type="button">
+                      下周
+                    </button>
+                  </div>
+
+                  <label className={styles.scheduleField}>
+                    <span>
+                      <Calendar aria-hidden="true" size={16} />
+                      截止时间
+                    </span>
+                    <input
+                      onChange={(e) => setDueDate(e.target.value)}
+                      type="datetime-local"
+                      value={dueDate}
+                    />
+                  </label>
+
+                  <div className={styles.advancedDivider}>
+                    <span>更多设置</span>
+                  </div>
+
+                  <label className={styles.scheduleField}>
+                    <span>
+                      <Bell aria-hidden="true" size={16} />
+                      提醒
+                    </span>
+                    <input
+                      onChange={(e) => setReminderAt(e.target.value)}
+                      type="datetime-local"
+                      value={reminderAt}
+                    />
+                  </label>
+
+                  <label className={styles.scheduleField}>
+                    <span>
+                      <RotateCw aria-hidden="true" size={16} />
+                      重复
+                    </span>
+                    <select
+                      onChange={(e) =>
+                        setRecurrenceRule(e.target.value as RecurrenceRule)
+                      }
+                      value={recurrenceRule}
+                    >
+                      <option value="none">不重复</option>
+                      <option value="daily">每天</option>
+                      <option value="workday">工作日</option>
+                      <option value="weekly">每周</option>
+                      <option value="monthly">每月</option>
+                      <option value="yearly">每年</option>
+                    </select>
+                  </label>
+
+                  <label className={styles.scheduleField}>
+                    <span>
+                      <Flag aria-hidden="true" size={16} />
+                      优先级
+                    </span>
+                    <select
+                      onChange={(e) =>
+                        setPriority(e.target.value as TaskPriority)
+                      }
+                      value={priority}
+                    >
+                      <option value="none">无</option>
+                      <option value="low">低</option>
+                      <option value="medium">中</option>
+                      <option value="high">高</option>
+                    </select>
+                  </label>
+
+                  <label className={styles.scheduleField}>
+                    <span>
+                      <Inbox aria-hidden="true" size={16} />
+                      清单
+                    </span>
+                    <select
+                      onChange={(e) => setListName(e.target.value)}
+                      value={listName}
+                    >
+                      {lists.map((list) => (
+                        <option key={list} value={list}>
+                          {list}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {isAddingList ? (
+                    <>
+                      <label className={styles.scheduleField}>
+                        <span>
+                          <Plus aria-hidden="true" size={16} />
+                          新清单
+                        </span>
+                        <input
+                          aria-label="新清单名称"
+                          autoFocus
+                          maxLength={100}
+                          onChange={(event) =>
+                            setNewListName(event.target.value)
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              void handleCreateList();
+                            }
+                            if (event.key === "Escape") {
+                              event.stopPropagation();
+                              setIsAddingList(false);
+                              setNewListName("");
+                            }
+                          }}
+                          placeholder="例如：工作"
+                          type="text"
+                          value={newListName}
+                        />
+                      </label>
+                      <div className={styles.scheduleActions}>
+                        <button
+                          onClick={() => {
+                            setIsAddingList(false);
+                            setNewListName("");
+                          }}
+                          type="button"
+                        >
+                          取消
+                        </button>
+                        <button
+                          className={styles.scheduleConfirm}
+                          disabled={!newListName.trim() || isCreatingList}
+                          onClick={() => void handleCreateList()}
+                          type="button"
+                        >
+                          创建
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <button
+                      className={styles.scheduleTrigger}
+                      onClick={() => setIsAddingList(true)}
+                      type="button"
+                    >
+                      <Plus aria-hidden="true" size={15} />
+                      新建清单
+                    </button>
+                  )}
+
+                  <label className={styles.scheduleNotes}>
+                    <span>备注</span>
+                    <textarea
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="补充任务说明"
+                      rows={2}
+                      value={description}
+                    />
+                  </label>
+
+                  <div className={styles.scheduleActions}>
+                    <button
+                      onClick={() => {
+                        setDueDate("");
+                        setReminderAt("");
+                        setRecurrenceRule("none");
+                      }}
+                      type="button"
+                    >
+                      清除时间
+                    </button>
+                    <button
+                      className={styles.scheduleConfirm}
+                      onClick={() => setIsScheduleOpen(false)}
+                      type="button"
+                    >
+                      <Check aria-hidden="true" size={15} />
+                      确定
+                    </button>
+                  </div>
+                </section>
+              </>
+            ) : null}
           </form>
 
           <p className={styles.reminderHint}>

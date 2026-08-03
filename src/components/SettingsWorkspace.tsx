@@ -3,6 +3,7 @@
 import { ChangeEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { upload } from "@vercel/blob/client";
 import { SidebarTagTree } from "./SidebarTagTree";
 import {
   CheckSquare,
@@ -19,6 +20,11 @@ import {
   Upload,
 } from "lucide-react";
 import type { ImportBatch } from "@/lib/db";
+import {
+  MAX_IMAGE_BYTES,
+  extensionForContentType,
+} from "@/lib/attachment-constants";
+import { attachmentUploadMode } from "@/lib/attachment-upload";
 import styles from "@/app/settings/settings.module.css";
 
 type SettingsWorkspaceProps = {
@@ -31,8 +37,14 @@ type SettingsWorkspaceProps = {
 type PreviewStats = {
   memoCount: number;
   taskCount: number;
+  attachmentCount: number;
   tagsFound: string[];
   listsFound: string[];
+};
+
+const directoryInputProps = {
+  webkitdirectory: "",
+  directory: "",
 };
 
 export function SettingsWorkspace({
@@ -53,52 +65,132 @@ export function SettingsWorkspace({
   >("flomo");
   const [fileContent, setFileContent] = useState("");
   const [fileName, setFileName] = useState("");
+  const [flomoFiles, setFlomoFiles] = useState<Map<string, File>>(new Map());
   const [previewStats, setPreviewStats] = useState<PreviewStats | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [notice, setNotice] = useState("");
+
+  async function previewImport(content: string) {
+    setFileContent(content);
+    const res = await fetch("/api/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: importSource,
+        fileContent: content,
+        action: "preview",
+      }),
+    });
+    const data = (await res.json()) as {
+      previewStats?: PreviewStats;
+      error?: string;
+    };
+    if (!res.ok) throw new Error(data.error ?? "文件分析失败");
+    setPreviewStats(data.previewStats ?? null);
+    setNotice("文件可导入，请核对预览信息后提交");
+  }
 
   async function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
+    setFlomoFiles(new Map());
     setNotice("正在读取并分析文件...");
     setPreviewStats(null);
+    try {
+      await previewImport(await file.text());
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "文件格式有误，无法解析");
+    }
+  }
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const content = event.target?.result as string;
-      setFileContent(content);
+  async function handleFlomoFolderSelect(e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    const htmlFile = files.find((file) => /\.html?$/i.test(file.name));
+    if (!htmlFile) {
+      setNotice("所选文件夹中没有找到 flomo 导出的 HTML 文件");
+      return;
+    }
 
-      // Perform preview request
-      try {
-        const res = await fetch("/api/import", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            source: importSource,
-            fileContent: content,
-            action: "preview",
-          }),
-        });
+    const byRelativePath = new Map<string, File>();
+    for (const file of files) {
+      const path = file.webkitRelativePath
+        .replace(/\\/g, "/")
+        .split("/")
+        .slice(1)
+        .join("/");
+      byRelativePath.set(path || file.name, file);
+    }
+    setFlomoFiles(byRelativePath);
+    setFileName(`${htmlFile.webkitRelativePath.split("/")[0] || "flomo 导出文件夹"}（含 ${files.length - 1} 个附件文件）`);
+    setNotice("正在读取并分析 flomo 导出文件夹...");
+    setPreviewStats(null);
+    try {
+      await previewImport(await htmlFile.text());
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "文件格式有误，无法解析");
+    }
+  }
 
-        const data = (await res.json()) as {
-          previewStats?: PreviewStats;
-          error?: string;
-        };
+  function normalizedImageFile(file: File): File | null {
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    const contentType = file.type || (extension === "jpg" || extension === "jpeg"
+      ? "image/jpeg"
+      : extension === "png"
+      ? "image/png"
+      : extension === "gif"
+      ? "image/gif"
+      : extension === "webp"
+      ? "image/webp"
+      : "");
+    if (!extensionForContentType(contentType) || file.size > MAX_IMAGE_BYTES) return null;
+    return file.type === contentType
+      ? file
+      : new File([file], file.name, { type: contentType, lastModified: file.lastModified });
+  }
 
-        if (!res.ok) {
-          setNotice(data.error ?? "文件分析失败");
-          return;
-        }
+  async function uploadImportedAttachment(memoId: string, sourceFile: File) {
+    const file = normalizedImageFile(sourceFile);
+    if (!file) throw new Error("图片格式或大小不受支持");
+    if (attachmentUploadMode() === "local") {
+      const formData = new FormData();
+      formData.set("file", file);
+      const response = await fetch(`/api/memos/${memoId}/attachments`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) throw new Error("附件保存失败");
+      return;
+    }
 
-        setPreviewStats(data.previewStats ?? null);
-        setNotice("文件可导入，请核对预览信息后提交");
-      } catch {
-        setNotice("文件格式有误，无法解析");
-      }
-    };
-    reader.readAsText(file);
+    const extension = extensionForContentType(file.type)!;
+    const pathname = `attachments/${memoId}/${crypto.randomUUID()}${extension}`;
+    const blob = await upload(pathname, file, {
+      access: "private",
+      contentType: file.type,
+      handleUploadUrl: `/api/memos/${memoId}/attachments/upload`,
+      clientPayload: JSON.stringify({
+        memoId,
+        filename: file.name,
+        contentType: file.type,
+        byteSize: file.size,
+      }),
+    });
+    const response = await fetch(`/api/memos/${memoId}/attachments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        memoId,
+        filename: file.name,
+        contentType: file.type,
+        byteSize: file.size,
+        pathname: blob.pathname,
+        thumbnailPathname: null,
+      }),
+    });
+    if (!response.ok) throw new Error("附件登记失败");
   }
 
   async function handleCommitImport() {
@@ -120,6 +212,7 @@ export function SettingsWorkspace({
 
       const data = (await res.json()) as {
         batch?: ImportBatch;
+        importedMemos?: Array<{ id: string; attachmentPaths: string[] }>;
         message?: string;
         error?: string;
       };
@@ -132,10 +225,41 @@ export function SettingsWorkspace({
         setTaskCount((prev) => prev + data.batch!.taskCount);
       }
 
+      let uploadedAttachments = 0;
+      let failedAttachments = 0;
+      const importedMemos = data.importedMemos ?? [];
+      const totalAttachments = importedMemos.reduce(
+        (count, memo) => count + memo.attachmentPaths.length,
+        0,
+      );
+      for (const memo of importedMemos) {
+        for (const attachmentPath of memo.attachmentPaths) {
+          const file = flomoFiles.get(attachmentPath);
+          if (!file) {
+            failedAttachments++;
+            continue;
+          }
+          setNotice(`正在导入附件 ${uploadedAttachments + failedAttachments + 1}/${totalAttachments}...`);
+          try {
+            await uploadImportedAttachment(memo.id, file);
+            uploadedAttachments++;
+          } catch {
+            failedAttachments++;
+          }
+        }
+      }
+
       setPreviewStats(null);
       setFileContent("");
       setFileName("");
-      setNotice(data.message ?? "数据导入成功！");
+      setFlomoFiles(new Map());
+      setNotice(
+        failedAttachments > 0
+          ? `${data.message ?? "数据导入成功！"} 已保存 ${uploadedAttachments} 个附件，${failedAttachments} 个附件未能导入。`
+          : totalAttachments > 0
+          ? `${data.message ?? "数据导入成功！"} 已保存 ${uploadedAttachments} 个附件。`
+          : data.message ?? "数据导入成功！",
+      );
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "导入提交失败");
     } finally {
@@ -287,7 +411,7 @@ export function SettingsWorkspace({
               <h2>历史数据导入 (flomo & 滴答清单)</h2>
             </div>
             <p className={styles.sectionDescription}>
-              支持无缝从 flomo 导出的 HTML 文件、滴答清单 (TickTick) 导出的 CSV 文件或 Shinian 备份 JSON 导入历史数据。包含预检预览与一键全批次撤销支持。
+              支持从 flomo 导出文件夹（HTML 与 file 附件）、滴答清单 (TickTick) 导出的 CSV 文件或 Shinian 备份 JSON 导入历史数据。包含预检预览与一键全批次撤销支持。
             </p>
 
             <div className={styles.importForm}>
@@ -342,7 +466,7 @@ export function SettingsWorkspace({
                     ? `已选择文件: ${fileName}`
                     : `点击或拖拽上传 ${
                         importSource === "flomo"
-                          ? ".html"
+                          ? "flomo 导出文件夹"
                           : importSource === "ticktick"
                           ? ".csv"
                           : ".json"
@@ -351,12 +475,18 @@ export function SettingsWorkspace({
                 <input
                   accept={
                     importSource === "flomo"
-                      ? ".html,.htm"
+                      ? undefined
                       : importSource === "ticktick"
                       ? ".csv"
                       : ".json"
                   }
-                  onChange={handleFileSelect}
+                  multiple={importSource === "flomo"}
+                  onChange={
+                    importSource === "flomo"
+                      ? handleFlomoFolderSelect
+                      : handleFileSelect
+                  }
+                  {...(importSource === "flomo" ? directoryInputProps : {})}
                   style={{ display: "none" }}
                   type="file"
                 />
@@ -368,6 +498,9 @@ export function SettingsWorkspace({
                   <div className={styles.previewTitle}>解析预览成功：</div>
                   <div>包含 Memo 笔记：{previewStats.memoCount} 条</div>
                   <div>包含 Task 任务：{previewStats.taskCount} 条</div>
+                  {previewStats.attachmentCount > 0 ? (
+                    <div>包含图片附件：{previewStats.attachmentCount} 个</div>
+                  ) : null}
                   {previewStats.tagsFound.length > 0 ? (
                     <div>检测到标签：{previewStats.tagsFound.join(", ")}</div>
                   ) : null}

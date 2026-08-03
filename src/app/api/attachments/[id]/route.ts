@@ -32,7 +32,7 @@ export async function GET(
       return new NextResponse(null, {
         status: 304,
         headers: {
-          ETag: result.blob.etag,
+          ETag: result.etag,
           "Cache-Control": "private, no-cache",
         },
       });
@@ -40,10 +40,10 @@ export async function GET(
 
     return new NextResponse(result.stream, {
       headers: {
-        "Content-Type": result.blob.contentType,
-        "Content-Length": String(result.blob.size),
+        "Content-Type": result.contentType,
+        "Content-Length": String(result.size),
         "Cache-Control": "private, no-cache",
-        ETag: result.blob.etag,
+        ETag: result.etag,
         "X-Content-Type-Options": "nosniff",
         "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(attachment.filename)}`,
       },

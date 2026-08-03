@@ -140,6 +140,8 @@
 
 .main {
   display: flex;
+  width: 100%;
+  min-width: 0;
   flex-direction: column;
   align-items: center;
   padding: 40px 24px 72px;
@@ -151,6 +153,7 @@
 
 .contentColumn {
   width: 100%;
+  min-width: 0;
   max-width: 760px;
 }
 
@@ -195,15 +198,25 @@
 /* View Tabs Filter Pills */
 .viewTabs {
   display: flex;
-  flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
+  flex-wrap: nowrap;
   gap: 8px;
   margin-bottom: 24px;
   padding-bottom: 12px;
+  overflow-x: auto;
   border-bottom: 1px solid var(--divider);
+  scrollbar-width: none;
+}
+
+.viewTabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tabButton {
   display: inline-flex;
+  min-height: 40px;
+  flex: 0 0 auto;
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
@@ -214,7 +227,7 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
 .tabButton:hover {
@@ -250,11 +263,60 @@
   color: var(--accent-strong);
 }
 
+.listFilterControl {
+  display: inline-flex;
+  min-height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--divider);
+  border-radius: 999px;
+  background: var(--surface-quiet);
+  color: var(--ink-soft);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.listFilterControl:active {
+  transform: scale(0.98);
+}
+
+.listFilterControl select {
+  max-width: 132px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  outline: none;
+  cursor: pointer;
+}
+
+.listFilterControl > svg:last-child {
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+
+.listFilterActive {
+  border-color: var(--accent);
+  background: var(--surface);
+  color: var(--accent-strong);
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+@media (hover: hover) {
+  .listFilterControl:hover {
+    border-color: rgba(200, 109, 81, 0.3);
+    background: var(--surface);
+    color: var(--ink);
+  }
+}
+
 /* Composer / Task Input */
 .composerCard {
+  position: relative;
   margin-bottom: 28px;
-  padding: 18px 20px;
-  border: 1px solid var(--divider);
+  padding: 8px 9px 8px 15px;
   border-radius: var(--radius-surface);
   background: var(--surface);
   box-shadow: var(--shadow-composer);
@@ -262,12 +324,19 @@
 
 .composerTitleRow {
   display: flex;
+  min-height: 48px;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+
+.composerPlus {
+  flex: 0 0 auto;
+  color: var(--ink-muted);
 }
 
 .titleInput {
   flex: 1;
+  min-width: 0;
   border: none;
   background: transparent;
   color: var(--ink);
@@ -278,6 +347,250 @@
 
 .titleInput::placeholder {
   color: var(--ink-muted);
+}
+
+.scheduleTrigger,
+.submitTaskButton {
+  display: inline-flex;
+  min-height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.scheduleTrigger {
+  gap: 6px;
+  padding: 0 10px;
+  background: var(--surface-quiet);
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.scheduleTriggerActive {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.scheduleTrigger svg:last-child {
+  color: var(--ink-muted);
+}
+
+.submitTaskButton {
+  padding: 0 14px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 650;
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.submitTaskButton:disabled {
+  width: 0;
+  min-height: 40px;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: none;
+}
+
+.scheduleBackdrop {
+  display: none;
+}
+
+.schedulePanel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100dvh - 280px);
+  padding: 18px;
+  overflow-y: auto;
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+  box-shadow: var(--shadow-floating);
+  overscroll-behavior: contain;
+  animation: scheduleEnter 180ms var(--ease-spring);
+}
+
+@keyframes scheduleEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scheduleHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.scheduleHeader > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.scheduleHeader strong {
+  color: var(--ink);
+  font-family: var(--font-reading);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.scheduleHeader span {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.iconButton {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  margin: -7px -7px 0 0;
+  place-items: center;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.quickDates {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.quickDates button,
+.scheduleActions button {
+  min-height: 40px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: var(--surface-quiet);
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.scheduleField {
+  display: grid;
+  min-height: 46px;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.scheduleField > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.scheduleField > span svg {
+  color: var(--ink-muted);
+}
+
+.scheduleField input,
+.scheduleField select,
+.scheduleNotes textarea {
+  width: 100%;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-control);
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 13px;
+  outline: none;
+}
+
+.scheduleField input,
+.scheduleField select {
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.advancedDivider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 4px;
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.advancedDivider::after {
+  height: 1px;
+  flex: 1;
+  background: var(--divider);
+  content: "";
+}
+
+.scheduleNotes {
+  display: flex;
+  margin-top: 9px;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.scheduleNotes textarea {
+  min-height: 64px;
+  padding: 10px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.scheduleActions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--divider);
+}
+
+.scheduleActions button {
+  padding: 0 15px;
+}
+
+.scheduleActions .scheduleConfirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: #ffffff;
+}
+
+@media (hover: hover) {
+  .scheduleTrigger:hover,
+  .quickDates button:hover,
+  .scheduleActions button:hover,
+  .iconButton:hover {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+
+  .submitTaskButton:hover:not(:disabled),
+  .scheduleActions .scheduleConfirm:hover {
+    background: var(--accent-strong);
+  }
 }
 
 .descriptionInput {
@@ -333,32 +646,6 @@
   font-size: 12px;
   outline: none;
   cursor: pointer;
-}
-
-.submitTaskButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
-  border: none;
-  border-radius: var(--radius-control);
-  background: var(--accent);
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 12px var(--accent-glow);
-  transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.submitTaskButton:hover:not(:disabled) {
-  background: var(--accent-strong);
-}
-
-.submitTaskButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  box-shadow: none;
 }
 
 /* Task List */
@@ -639,7 +926,88 @@
     padding: 12px 16px 64px;
   }
 
+  .composerCard {
+    padding-left: 12px;
+  }
+
+  .titleInput {
+    font-size: 15px;
+  }
+
+  .scheduleTrigger {
+    padding: 0 9px;
+  }
+
+  .scheduleTrigger svg:last-child {
+    display: none;
+  }
+
+  .submitTaskButton {
+    padding: 0 12px;
+  }
+
+  .scheduleBackdrop {
+    position: fixed;
+    z-index: 59;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: rgba(31, 32, 35, 0.24);
+    cursor: default;
+  }
+
+  .schedulePanel {
+    position: fixed;
+    z-index: 60;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: min(82dvh, 680px);
+    padding: 20px 18px max(20px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+    border-radius: var(--radius-shell) var(--radius-shell) 0 0;
+    overscroll-behavior: contain;
+    animation-name: scheduleSheetEnter;
+  }
+
+  @keyframes scheduleSheetEnter {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   .taskActions {
     opacity: 1;
   }
+}
+
+@media (max-width: 420px) {
+  .composerPlus {
+    display: none;
+  }
+
+  .titleInput::placeholder {
+    font-size: 14px;
+  }
+
+  .scheduleTrigger span {
+    max-width: 48px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .scheduleField {
+    grid-template-columns: 90px minmax(0, 1fr);
+  }
+
 }

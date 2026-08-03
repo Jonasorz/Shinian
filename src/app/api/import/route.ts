@@ -63,7 +63,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return apiError("没有找到可导入的卡片笔记或任务记录", 400);
   }
 
-  const batch = await createImportBatch({
+  const { batch, memoIds } = await createImportBatch({
     source,
     memos: parseResult.memos,
     tasks: parseResult.tasks,
@@ -72,6 +72,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   return NextResponse.json({
     action: "commit",
     batch,
+    importedMemos: parseResult.memos.map((memo, index) => ({
+      id: memoIds[index]!,
+      attachmentPaths: memo.attachmentPaths ?? [],
+    })),
     message: `成功导入 ${batch.memoCount} 条笔记，${batch.taskCount} 条任务！`,
   });
 }
