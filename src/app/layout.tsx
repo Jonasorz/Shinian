@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { MobileNavigation } from "@/components/MobileNavigation";
 import { PwaRegister } from "@/components/PwaRegister";
 import "./globals.css";
 
@@ -38,6 +39,7 @@ export default function RootLayout({
           跳到主要内容
         </a>
         {children}
+        <MobileNavigation />
         <PwaRegister />
       </body>
     </html>

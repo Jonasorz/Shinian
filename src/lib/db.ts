@@ -3,6 +3,11 @@ import "server-only";
 import postgres, { type Sql } from "postgres";
 import { extractTags, type TagWithCount } from "./tags";
 import { nextOccurrence } from "./recurrence";
+import {
+  DEFAULT_MEMO_PAGE_SIZE,
+  encodeMemoCursor,
+  type MemoCursor,
+} from "./memo-pagination";
 export type { TagWithCount };
 import type {
   Memo,
@@ -83,6 +88,7 @@ type AttachmentRow = {
   content_type: string;
   byte_size: number;
   storage_key: string;
+  thumbnail_storage_key: string | null;
   created_at: Date;
 };
 
@@ -95,6 +101,9 @@ function toAttachment(row: AttachmentRow): MemoAttachment {
     byteSize: row.byte_size,
     createdAt: row.created_at.toISOString(),
     url: `/api/attachments/${row.id}`,
+    thumbnailUrl: row.thumbnail_storage_key
+      ? `/api/attachments/${row.id}?variant=thumbnail`
+      : null,
   };
 }
 
@@ -150,6 +159,62 @@ export async function listMemos(): Promise<Memo[]> {
   return withMemoAttachments(rows.map(toMemo));
 }
 
+export async function listMemoPage(params?: {
+  cursor?: MemoCursor | null;
+  limit?: number;
+}): Promise<{ memos: Memo[]; nextCursor: string | null }> {
+  const limit = params?.limit ?? DEFAULT_MEMO_PAGE_SIZE;
+  const cursor = params?.cursor ?? null;
+  const rows = cursor
+    ? await database()<MemoRow[]>`
+        SELECT id, content, created_at, updated_at, deleted_at
+        FROM memos
+        WHERE deleted_at IS NULL
+          AND (created_at, id) < (${new Date(cursor.createdAt)}, ${cursor.id}::uuid)
+        ORDER BY created_at DESC, id DESC
+        LIMIT ${limit + 1}
+      `
+    : await database()<MemoRow[]>`
+        SELECT id, content, created_at, updated_at, deleted_at
+        FROM memos
+        WHERE deleted_at IS NULL
+        ORDER BY created_at DESC, id DESC
+        LIMIT ${limit + 1}
+      `;
+
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const memos = await withMemoAttachments(pageRows.map(toMemo));
+  const last = pageRows.at(-1);
+  return {
+    memos,
+    nextCursor:
+      hasMore && last
+        ? encodeMemoCursor({
+            createdAt: last.created_at.toISOString(),
+            id: last.id,
+          })
+        : null,
+  };
+}
+
+export async function getContentCounts(): Promise<{
+  memoCount: number;
+  taskCount: number;
+}> {
+  const [row] = await database()<
+    Array<{ memo_count: number; task_count: number }>
+  >`
+    SELECT
+      (SELECT count(*)::int FROM memos WHERE deleted_at IS NULL) AS memo_count,
+      (SELECT count(*)::int FROM tasks WHERE deleted_at IS NULL) AS task_count
+  `;
+  return {
+    memoCount: row?.memo_count ?? 0,
+    taskCount: row?.task_count ?? 0,
+  };
+}
+
 export async function listAllMemos(): Promise<Memo[]> {
   const rows = await database()<MemoRow[]>`
     SELECT id, content, created_at, updated_at, deleted_at
@@ -168,6 +233,15 @@ export async function createMemo(content: string): Promise<Memo> {
   `;
 
   return toMemo(row);
+}
+
+export async function memoExists(id: string): Promise<boolean> {
+  const rows = await database()<Array<{ exists: boolean }>>`
+    SELECT EXISTS(
+      SELECT 1 FROM memos WHERE id = ${id} AND deleted_at IS NULL
+    ) AS exists
+  `;
+  return rows[0]?.exists ?? false;
 }
 
 export async function updateMemo(
@@ -209,7 +283,10 @@ export async function softDeleteMemo(id: string): Promise<Memo | null> {
   return (await withMemoAttachments([toMemo(rows[0])]))[0] ?? null;
 }
 
-export type StoredMemoAttachment = MemoAttachment & { storageKey: string };
+export type StoredMemoAttachment = MemoAttachment & {
+  storageKey: string;
+  thumbnailStorageKey: string | null;
+};
 
 export async function createMemoAttachment(input: {
   memoId: string;
@@ -217,16 +294,23 @@ export async function createMemoAttachment(input: {
   contentType: string;
   byteSize: number;
   storageKey: string;
+  thumbnailStorageKey?: string | null;
 }): Promise<MemoAttachment | null> {
   const id = crypto.randomUUID();
   const rows = await database()<AttachmentRow[]>`
     INSERT INTO memo_attachments (
-      id, memo_id, filename, content_type, byte_size, storage_key
+      id, memo_id, filename, content_type, byte_size, storage_key,
+      thumbnail_storage_key
     )
     SELECT ${id}, id, ${input.filename}, ${input.contentType},
-      ${input.byteSize}, ${input.storageKey}
+      ${input.byteSize}, ${input.storageKey}, ${input.thumbnailStorageKey ?? null}
     FROM memos
     WHERE id = ${input.memoId} AND deleted_at IS NULL
+    ON CONFLICT (storage_key) DO UPDATE
+    SET thumbnail_storage_key = COALESCE(
+      memo_attachments.thumbnail_storage_key,
+      EXCLUDED.thumbnail_storage_key
+    )
     RETURNING *
   `;
   return rows[0] ? toAttachment(rows[0]) : null;
@@ -241,7 +325,13 @@ export async function getStoredMemoAttachment(
     WHERE a.id = ${id} AND m.deleted_at IS NULL
   `;
   const row = rows[0];
-  return row ? { ...toAttachment(row), storageKey: row.storage_key } : null;
+  return row
+    ? {
+        ...toAttachment(row),
+        storageKey: row.storage_key,
+        thumbnailStorageKey: row.thumbnail_storage_key,
+      }
+    : null;
 }
 
 export async function listStoredMemoAttachments(): Promise<StoredMemoAttachment[]> {
@@ -250,7 +340,11 @@ export async function listStoredMemoAttachments(): Promise<StoredMemoAttachment[
     JOIN memos m ON m.id = a.memo_id
     ORDER BY a.created_at ASC
   `;
-  return rows.map((row) => ({ ...toAttachment(row), storageKey: row.storage_key }));
+  return rows.map((row) => ({
+    ...toAttachment(row),
+    storageKey: row.storage_key,
+    thumbnailStorageKey: row.thumbnail_storage_key,
+  }));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -318,6 +412,16 @@ export async function listTasks(params?: {
     `;
   }
 
+  return rows.map(toTask);
+}
+
+async function listRecentTasks(limit = 50): Promise<Task[]> {
+  const rows = await database()<TaskRow[]>`
+    SELECT * FROM tasks
+    WHERE deleted_at IS NULL
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
   return rows.map(toTask);
 }
 
@@ -525,9 +629,17 @@ export async function searchMemosAndTasks(params: {
     tag === "#无标签" || tag === "无标签" || q === "#无标签" || q === "无标签";
 
   if (isUntaggedQuery) {
-    const allMemos = await listMemos();
-    const memos = allMemos.filter((m) => extractTags(m.content).length === 0);
-    return { memos, tasks: [] };
+    const rows = await sql<MemoRow[]>`
+      SELECT id, content, created_at, updated_at, deleted_at
+      FROM memos
+      WHERE deleted_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 200
+    `;
+    const memos = rows
+      .map(toMemo)
+      .filter((memo) => extractTags(memo.content).length === 0);
+    return { memos: await withMemoAttachments(memos), tasks: [] };
   }
 
   let memos: Memo[] = [];
@@ -568,7 +680,7 @@ export async function searchMemosAndTasks(params: {
       `;
       memos = rows.map(toMemo);
     } else {
-      memos = await listMemos();
+      memos = (await listMemoPage({ limit: 50 })).memos;
     }
   }
 
@@ -584,7 +696,7 @@ export async function searchMemosAndTasks(params: {
       `;
       tasks = rows.map(toTask);
     } else {
-      tasks = await listTasks({ view: "all" });
+      tasks = await listRecentTasks(50);
     }
   }
 

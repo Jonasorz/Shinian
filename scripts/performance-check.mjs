@@ -20,16 +20,39 @@ try {
       FROM generate_series(1, 10000) AS n
     `;
 
-    const listStarted = performance.now();
-    await tx`SELECT id, content FROM memos WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 500`;
-    const listMs = performance.now() - listStarted;
+    const legacyListStarted = performance.now();
+    const legacyRows = await tx`SELECT id, content FROM memos WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 500`;
+    const legacyListMs = performance.now() - legacyListStarted;
+
+    const pageStarted = performance.now();
+    const pageRows = await tx`SELECT id, content FROM memos WHERE deleted_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 30`;
+    const pageMs = performance.now() - pageStarted;
 
     const searchStarted = performance.now();
     await tx`SELECT id FROM memos WHERE deleted_at IS NULL AND content ILIKE ${"%#性能测试%"} LIMIT 200`;
     const searchMs = performance.now() - searchStarted;
 
-    console.log(JSON.stringify({ rows: 10000, listMs, searchMs }, null, 2));
-    if (listMs > 1000 || searchMs > 1500) {
+    console.log(
+      JSON.stringify(
+        {
+          rows: 10000,
+          legacy: {
+            rows: legacyRows.length,
+            queryMs: legacyListMs,
+            jsonBytes: Buffer.byteLength(JSON.stringify(legacyRows)),
+          },
+          paginated: {
+            rows: pageRows.length,
+            queryMs: pageMs,
+            jsonBytes: Buffer.byteLength(JSON.stringify(pageRows)),
+          },
+          searchMs,
+        },
+        null,
+        2,
+      ),
+    );
+    if (pageMs > 500 || searchMs > 1500) {
       throw new Error("Performance acceptance threshold exceeded");
     }
 

@@ -194,6 +194,60 @@
   text-align: right;
 }
 
+.uploadRecovery {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin-top: 12px;
+  padding: 12px 14px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid color-mix(in oklch, var(--danger) 30%, var(--divider));
+  border-radius: var(--radius-control);
+  background: color-mix(in oklch, var(--danger) 7%, var(--surface));
+  color: var(--danger);
+}
+
+.uploadRecovery > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.uploadRecovery strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.uploadRecovery span {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.uploadRecovery button,
+.loadMoreButton {
+  display: inline-flex;
+  min-height: 38px;
+  padding: 0 13px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.uploadRecovery button:disabled,
+.loadMoreButton:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 /* Doppelrand (Double-Bezel) Composer Outer Shell */
 .composer {
   padding: 8px;
@@ -455,6 +509,11 @@
   max-height: 360px;
   border-radius: 10px;
   object-fit: cover;
+}
+
+.loadMoreButton {
+  width: min(100%, 320px);
+  margin: 24px auto 0;
 }
 
 .inlineTag {
@@ -789,6 +848,15 @@
 
   .composerFooter {
     align-items: center;
+  }
+
+  .uploadRecovery {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .uploadRecovery button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .composerMeta > span:not(.errorText):first-child {

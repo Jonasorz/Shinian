@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { MemoWorkspace } from "@/components/MemoWorkspace";
-import { listMemos } from "@/lib/db";
+import { getContentCounts, listMemoPage } from "@/lib/db";
 import { currentUser } from "@/lib/session";
 
 export const metadata: Metadata = {
@@ -16,11 +16,17 @@ export default async function NotesPage() {
     redirect("/login");
   }
 
+  const [{ memos, nextCursor }, { memoCount }] = await Promise.all([
+    listMemoPage(),
+    getContentCounts(),
+  ]);
+
   return (
     <MemoWorkspace
-      initialMemos={await listMemos()}
+      initialMemos={memos}
+      initialNextCursor={nextCursor}
+      totalMemoCount={memoCount}
       username={user.username}
     />
   );
 }
-

@@ -11,9 +11,10 @@ import {
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { upload } from "@vercel/blob/client";
 import { SidebarTagTree } from "./SidebarTagTree";
-import { MobileNavigation } from "./MobileNavigation";
 import {
+  AlertTriangle,
   Check,
   CheckSquare,
   Feather,
@@ -24,11 +25,17 @@ import {
   Send,
   Settings,
   Sparkles,
+  RefreshCw,
   Trash2,
   Undo2,
   X,
 } from "lucide-react";
 import type { Memo, MemoAttachment } from "@/lib/types";
+import {
+  MAX_IMAGE_BYTES,
+  extensionForContentType,
+} from "@/lib/attachment-constants";
+import { createImageThumbnail } from "@/lib/image-thumbnail";
 import styles from "@/app/notes/notes.module.css";
 
 const DRAFT_KEY = "shinian.memo.draft";
@@ -42,6 +49,17 @@ type MemoGroup = {
 
 type UndoState = {
   memo: Memo;
+};
+
+type RetryImage = {
+  file: File;
+  pathname?: string;
+  thumbnailPathname?: string;
+};
+
+type RetryUploadBatch = {
+  memoId: string;
+  items: RetryImage[];
 };
 
 function localDateKey(value: string): string {
@@ -220,9 +238,13 @@ async function apiRequest<T>(
 
 export function MemoWorkspace({
   initialMemos,
+  initialNextCursor,
+  totalMemoCount: initialTotalMemoCount,
   username,
 }: {
   initialMemos: Memo[];
+  initialNextCursor: string | null;
+  totalMemoCount: number;
   username: string;
 }) {
   const router = useRouter();
@@ -231,6 +253,14 @@ export function MemoWorkspace({
   const [composerError, setComposerError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const [retryUploadBatches, setRetryUploadBatches] = useState<
+    RetryUploadBatch[]
+  >([]);
+  const [retryingMemoId, setRetryingMemoId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [nextCursor, setNextCursor] = useState(initialNextCursor);
+  const [totalMemoCount, setTotalMemoCount] = useState(initialTotalMemoCount);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(
@@ -295,6 +325,167 @@ export function MemoWorkspace({
     resizeTextarea(editRef.current);
   }, [editContent, editingId]);
 
+  function addAttachments(memoId: string, attachments: MemoAttachment[]) {
+    if (attachments.length === 0) return;
+    setMemos((current) =>
+      current.map((memo) =>
+        memo.id === memoId
+          ? {
+              ...memo,
+              attachments: [
+                ...memo.attachments,
+                ...attachments.filter(
+                  (attachment) =>
+                    !memo.attachments.some((item) => item.id === attachment.id),
+                ),
+              ],
+            }
+          : memo,
+      ),
+    );
+  }
+
+  async function uploadMemoImages(
+    memoId: string,
+    items: RetryImage[],
+  ): Promise<{ attachments: MemoAttachment[]; failed: RetryImage[] }> {
+    const attachments: MemoAttachment[] = [];
+    const failed: RetryImage[] = [];
+
+    for (const [index, item] of items.entries()) {
+      let retryItem = item;
+      try {
+        let pathname = item.pathname;
+        if (!pathname) {
+          const extension = extensionForContentType(item.file.type);
+          if (!extension || item.file.size > MAX_IMAGE_BYTES) {
+            throw new Error("图片格式或大小不受支持");
+          }
+          const requestedPath = `attachments/${memoId}/${crypto.randomUUID()}${extension}`;
+          const blob = await upload(requestedPath, item.file, {
+            access: "private",
+            contentType: item.file.type,
+            handleUploadUrl: `/api/memos/${memoId}/attachments/upload`,
+            clientPayload: JSON.stringify({
+              memoId,
+              filename: item.file.name,
+              contentType: item.file.type,
+              byteSize: item.file.size,
+            }),
+            onUploadProgress: ({ percentage }) => {
+              setUploadProgress(
+                Math.round(((index + percentage / 100) / items.length) * 100),
+              );
+            },
+          });
+          pathname = blob.pathname;
+          retryItem = { ...item, pathname };
+        }
+
+        let thumbnailPathname = item.thumbnailPathname;
+        if (!thumbnailPathname) {
+          const thumbnail = await createImageThumbnail(item.file);
+          if (thumbnail) {
+            try {
+              const requestedThumbnailPath = `attachments/${memoId}/thumbnails/${crypto.randomUUID()}.webp`;
+              const thumbnailBlob = await upload(
+                requestedThumbnailPath,
+                thumbnail,
+                {
+                  access: "private",
+                  contentType: "image/webp",
+                  handleUploadUrl: `/api/memos/${memoId}/attachments/upload`,
+                  clientPayload: JSON.stringify({
+                    memoId,
+                    filename: item.file.name,
+                    contentType: item.file.type,
+                    byteSize: item.file.size,
+                  }),
+                },
+              );
+              thumbnailPathname = thumbnailBlob.pathname;
+              retryItem = { ...retryItem, thumbnailPathname };
+            } catch {
+              // The original remains usable; thumbnail generation is best effort.
+            }
+          }
+        }
+
+        const response = await fetch(`/api/memos/${memoId}/attachments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            memoId,
+            filename: item.file.name,
+            contentType: item.file.type,
+            byteSize: item.file.size,
+            pathname,
+            thumbnailPathname: thumbnailPathname ?? null,
+          }),
+        });
+        const result = (await response.json()) as {
+          attachment?: MemoAttachment;
+          error?: string;
+        };
+        if (!response.ok || !result.attachment) {
+          throw new Error(result.error ?? "图片登记失败");
+        }
+        attachments.push(result.attachment);
+        setUploadProgress(Math.round(((index + 1) / items.length) * 100));
+      } catch {
+        failed.push(retryItem);
+      }
+    }
+    setUploadProgress(null);
+    return { attachments, failed };
+  }
+
+  async function retryImageUploads(batch: RetryUploadBatch) {
+    setRetryingMemoId(batch.memoId);
+    const result = await uploadMemoImages(batch.memoId, batch.items);
+    addAttachments(batch.memoId, result.attachments);
+    setRetryUploadBatches((current) =>
+      result.failed.length > 0
+        ? current.map((item) =>
+            item.memoId === batch.memoId
+              ? { ...item, items: result.failed }
+              : item,
+          )
+        : current.filter((item) => item.memoId !== batch.memoId),
+    );
+    setNotice(
+      result.failed.length > 0
+        ? `仍有 ${result.failed.length} 张图片未上传`
+        : "图片已补传完成",
+    );
+    setRetryingMemoId(null);
+  }
+
+  async function loadMoreMemos() {
+    if (!nextCursor || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const data = await apiRequest<{
+        memos: Memo[];
+        nextCursor: string | null;
+      }>(`/api/memos?cursor=${encodeURIComponent(nextCursor)}&limit=30`, {
+        method: "GET",
+      });
+      setMemos((current) => {
+        const known = new Set(current.map((memo) => memo.id));
+        return sortMemos([
+          ...current,
+          ...data.memos.filter((memo) => !known.has(memo.id)),
+        ]);
+      });
+      setNextCursor(data.nextCursor);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "无法加载更多记录");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }
+
   async function createNewMemo() {
     const content = draft.trim();
     setComposerError("");
@@ -337,33 +528,19 @@ export function MemoWorkspace({
       setMemos((current) =>
         sortMemos(current.map((m) => (m.id === tempId ? data.memo : m))),
       );
+      setTotalMemoCount((current) => current + 1);
 
-      const uploadedAttachments: MemoAttachment[] = [];
-      let uploadFailed = false;
-      for (const image of pendingImages) {
-        const formData = new FormData();
-        formData.append("file", image);
-        const uploadResponse = await fetch(`/api/memos/${data.memo.id}/attachments`, {
-          method: "POST",
-          body: formData,
-        });
-        if (!uploadResponse.ok) {
-          uploadFailed = true;
-          continue;
-        }
-        const result = (await uploadResponse.json()) as {
-          attachment: MemoAttachment;
-        };
-        uploadedAttachments.push(result.attachment);
-      }
-      if (uploadedAttachments.length > 0) {
-        setMemos((current) =>
-          current.map((memo) =>
-            memo.id === data.memo.id
-              ? { ...memo, attachments: uploadedAttachments }
-              : memo,
-          ),
-        );
+      const uploadResult = await uploadMemoImages(
+        data.memo.id,
+        pendingImages.map((file) => ({ file })),
+      );
+      addAttachments(data.memo.id, uploadResult.attachments);
+      const uploadFailed = uploadResult.failed.length > 0;
+      if (uploadFailed) {
+        setRetryUploadBatches((current) => [
+          ...current.filter((batch) => batch.memoId !== data.memo.id),
+          { memoId: data.memo.id, items: uploadResult.failed },
+        ]);
       }
       setPendingImages([]);
 
@@ -454,6 +631,7 @@ export function MemoWorkspace({
         method: "DELETE",
       });
       setMemos((current) => current.filter((item) => item.id !== memo.id));
+      setTotalMemoCount((current) => Math.max(0, current - 1));
       setConfirmingDeleteId(null);
       setUndoState({ memo });
       if (undoTimerRef.current) {
@@ -483,6 +661,7 @@ export function MemoWorkspace({
         },
       );
       setMemos((current) => sortMemos([data.memo, ...current]));
+      setTotalMemoCount((current) => current + 1);
       setUndoState(null);
       setNotice("记录已恢复");
       window.setTimeout(() => setNotice(""), 1400);
@@ -584,8 +763,6 @@ export function MemoWorkspace({
           </button>
         </header>
 
-        <MobileNavigation active="notes" />
-
         <div className={styles.contentColumn}>
           <section className={styles.composerSection} aria-label="快速记录">
             <div className={styles.composerHeading}>
@@ -661,8 +838,19 @@ export function MemoWorkspace({
                         accept="image/jpeg,image/png,image/gif,image/webp"
                         multiple
                         onChange={(event) => {
-                          const images = Array.from(event.target.files ?? []).slice(0, 4);
+                          const selected = Array.from(event.target.files ?? []).slice(0, 4);
+                          const images = selected.filter(
+                            (image) =>
+                              extensionForContentType(image.type) &&
+                              image.size > 0 &&
+                              image.size <= MAX_IMAGE_BYTES,
+                          );
                           setPendingImages(images);
+                          setComposerError(
+                            images.length === selected.length
+                              ? ""
+                              : "仅支持 JPG、PNG、GIF、WebP，单张不超过 10 MB",
+                          );
                           event.target.value = "";
                         }}
                         type="file"
@@ -672,19 +860,45 @@ export function MemoWorkspace({
                       disabled={isCreating || !draft.trim()}
                       type="submit"
                     >
-                      <span>{isCreating ? "保存中" : "记下"}</span>
+                      <span>
+                        {uploadProgress !== null
+                          ? `上传 ${uploadProgress}%`
+                          : isCreating
+                            ? "保存中"
+                            : "记下"}
+                      </span>
                       <Send aria-hidden="true" size={16} strokeWidth={1.8} />
                     </button>
                   </div>
                 </div>
               </div>
             </form>
+
+            {retryUploadBatches.map((batch) => (
+              <div className={styles.uploadRecovery} key={batch.memoId} role="alert">
+                <AlertTriangle aria-hidden="true" size={18} />
+                <div>
+                  <strong>{batch.items.length} 张图片尚未保存</strong>
+                  <span>笔记正文已保存，图片仍保留在当前页面，可立即重试。</span>
+                </div>
+                <button
+                  disabled={retryingMemoId === batch.memoId}
+                  onClick={() => void retryImageUploads(batch)}
+                  type="button"
+                >
+                  <RefreshCw aria-hidden="true" size={15} />
+                  {retryingMemoId === batch.memoId ? "重试中" : "重试上传"}
+                </button>
+              </div>
+            ))}
           </section>
 
           <section className={styles.timeline} aria-labelledby="timeline-title">
             <div className={styles.timelineHeader}>
               <h2 id="timeline-title">最近记录</h2>
-              <span>{memos.length} 条</span>
+              <span>
+                已显示 {memos.length} / {totalMemoCount} 条
+              </span>
             </div>
 
             {groups.length === 0 ? (
@@ -788,7 +1002,11 @@ export function MemoWorkspace({
                                         <Image
                                           alt={attachment.filename}
                                           height={480}
-                                          src={attachment.url}
+                                          loading="lazy"
+                                          sizes="(max-width: 820px) 46vw, 360px"
+                                          src={
+                                            attachment.thumbnailUrl ?? attachment.url
+                                          }
                                           unoptimized
                                           width={640}
                                         />
@@ -870,6 +1088,17 @@ export function MemoWorkspace({
                 ))}
               </div>
             )}
+
+            {nextCursor ? (
+              <button
+                className={styles.loadMoreButton}
+                disabled={isLoadingMore}
+                onClick={() => void loadMoreMemos()}
+                type="button"
+              >
+                {isLoadingMore ? "正在加载…" : "加载更早的记录"}
+              </button>
+            ) : null}
           </section>
         </div>
       </main>

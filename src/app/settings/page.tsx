@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { SettingsWorkspace } from "@/components/SettingsWorkspace";
-import { listImportBatches, listMemos, listTasks } from "@/lib/db";
+import { getContentCounts, listImportBatches } from "@/lib/db";
 import { currentUser } from "@/lib/session";
 
 export const metadata: Metadata = {
@@ -16,17 +16,16 @@ export default async function SettingsPage() {
     redirect("/login");
   }
 
-  const [memos, tasks, batches] = await Promise.all([
-    listMemos(),
-    listTasks({ view: "all" }),
+  const [{ memoCount, taskCount }, batches] = await Promise.all([
+    getContentCounts(),
     listImportBatches(),
   ]);
 
   return (
     <SettingsWorkspace
       initialBatches={batches}
-      memoCount={memos.length}
-      taskCount={tasks.length}
+      memoCount={memoCount}
+      taskCount={taskCount}
       username={user.username}
     />
   );

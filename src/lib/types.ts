@@ -6,6 +6,7 @@ export type MemoAttachment = {
   byteSize: number;
   createdAt: string;
   url: string;
+  thumbnailUrl: string | null;
 };
 
 export type Memo = {

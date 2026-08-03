@@ -19,6 +19,7 @@
   }
 
   .navigation a {
+    position: relative;
     display: flex;
     min-width: 0;
     min-height: 46px;
@@ -30,10 +31,43 @@
     font-size: 11px;
     font-weight: 600;
     text-decoration: none;
+    transition: color 120ms ease, background-color 120ms ease, transform 120ms ease;
+  }
+
+  .navigation a:active {
+    transform: scale(0.94);
   }
 
   .navigation a.active {
     background: var(--accent-soft);
     color: var(--accent-strong);
+  }
+
+  .navigation a.pending {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+
+  .navigation a.pending i {
+    position: absolute;
+    top: 5px;
+    right: calc(50% - 16px);
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentColor;
+    animation: navigationPulse 700ms ease-in-out infinite alternate;
+  }
+}
+
+@keyframes navigationPulse {
+  from {
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.15);
   }
 }

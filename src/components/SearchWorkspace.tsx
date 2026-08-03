@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SidebarTagTree } from "./SidebarTagTree";
-import { MobileNavigation } from "./MobileNavigation";
 import {
   CheckSquare,
   Feather,
@@ -214,8 +213,6 @@ export function SearchWorkspace({
             <LogOut aria-hidden="true" size={18} />
           </button>
         </header>
-
-        <MobileNavigation active="search" />
 
         <div className={styles.contentColumn}>
           <div className={styles.pageHeader}>

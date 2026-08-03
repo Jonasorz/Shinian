@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError, authorizeApiRequest } from "@/lib/api";
-import { readAttachmentFile } from "@/lib/attachments";
+import { streamAttachmentFile } from "@/lib/attachments";
 import { getStoredMemoAttachment } from "@/lib/db";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: RouteContext,
 ): Promise<NextResponse> {
   if (!(await authorizeApiRequest())) return apiError("请先登录", 401);
@@ -16,14 +16,35 @@ export async function GET(
 
   const attachment = await getStoredMemoAttachment(id);
   if (!attachment) return apiError("附件不存在", 404);
+  const variant = new URL(request.url).searchParams.get("variant");
+  const storageKey =
+    variant === "thumbnail"
+      ? attachment.thumbnailStorageKey ?? attachment.storageKey
+      : attachment.storageKey;
 
   try {
-    const bytes = await readAttachmentFile(attachment.storageKey);
-    return new NextResponse(new Uint8Array(bytes), {
+    const result = await streamAttachmentFile(
+      storageKey,
+      request.headers.get("if-none-match") ?? undefined,
+    );
+    if (!result) return apiError("附件文件缺失", 404);
+    if (result.statusCode === 304) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          ETag: result.blob.etag,
+          "Cache-Control": "private, no-cache",
+        },
+      });
+    }
+
+    return new NextResponse(result.stream, {
       headers: {
-        "Content-Type": attachment.contentType,
-        "Content-Length": String(attachment.byteSize),
-        "Cache-Control": "private, max-age=3600",
+        "Content-Type": result.blob.contentType,
+        "Content-Length": String(result.blob.size),
+        "Cache-Control": "private, no-cache",
+        ETag: result.blob.etag,
+        "X-Content-Type-Options": "nosniff",
         "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(attachment.filename)}`,
       },
     });

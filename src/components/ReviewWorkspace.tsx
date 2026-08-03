@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SidebarTagTree } from "./SidebarTagTree";
-import { MobileNavigation } from "./MobileNavigation";
 import {
   Calendar,
   Check,
@@ -249,8 +248,6 @@ export function ReviewWorkspace({
             <LogOut aria-hidden="true" size={18} />
           </button>
         </header>
-
-        <MobileNavigation active="review" />
 
         <div className={styles.contentColumn}>
           <div className={styles.pageHeader}>

@@ -6,14 +6,20 @@ import {
   authorizeMutationOrigin,
 } from "@/lib/api";
 import {
-  MAX_IMAGE_BYTES,
-  removeAttachmentFile,
-  saveAttachmentFile,
-  supportedImageExtension,
-} from "@/lib/attachments";
+  attachmentUploadMetadataSchema,
+  extensionForContentType,
+  isAttachmentPathForMemo,
+  isAttachmentThumbnailPathForMemo,
+} from "@/lib/attachment-upload";
+import { inspectAttachmentFile } from "@/lib/attachments";
 import { createMemoAttachment } from "@/lib/db";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+const completionSchema = attachmentUploadMetadataSchema.extend({
+  pathname: z.string().min(1).max(1024),
+  thumbnailPathname: z.string().min(1).max(1024).nullable().optional(),
+});
 
 export async function POST(
   request: NextRequest,
@@ -26,33 +32,59 @@ export async function POST(
   const { id } = await context.params;
   if (!z.string().uuid().safeParse(id).success) return apiError("记录 ID 无效", 400);
 
-  const formData = await request.formData().catch(() => null);
-  const file = formData?.get("file");
-  if (!(file instanceof File)) return apiError("请选择图片", 400);
-  if (file.size < 1 || file.size > MAX_IMAGE_BYTES) {
-    return apiError("图片大小必须在 10 MB 以内", 400);
+  const body = await request.json().catch(() => null);
+  const parsed = completionSchema.safeParse(body);
+  if (!parsed.success) return apiError("图片登记信息无效", 400);
+
+  const input = parsed.data;
+  const extension = extensionForContentType(input.contentType);
+  if (
+    input.memoId !== id ||
+    !extension ||
+    !input.pathname.toLowerCase().endsWith(extension) ||
+    !isAttachmentPathForMemo(input.pathname, id)
+  ) {
+    return apiError("图片存储路径无效", 400);
   }
 
-  const extension = supportedImageExtension(file.type);
-  if (!extension) return apiError("仅支持 JPG、PNG、GIF 和 WebP 图片", 400);
+  try {
+    const blob = await inspectAttachmentFile(input.pathname);
+    if (
+      blob.pathname !== input.pathname ||
+      blob.size !== input.byteSize ||
+      blob.contentType !== input.contentType
+    ) {
+      return apiError("图片信息与已上传文件不一致", 400);
+    }
 
-  const localStorageKey = `${crypto.randomUUID()}${extension}`;
-  const storageKey = await saveAttachmentFile(
-    localStorageKey,
-    new Uint8Array(await file.arrayBuffer()),
-    file.type,
-  );
-  const attachment = await createMemoAttachment({
-    memoId: id,
-    filename: file.name.slice(0, 255) || `image${extension}`,
-    contentType: file.type,
-    byteSize: file.size,
-    storageKey,
-  });
+    if (
+      input.thumbnailPathname &&
+      !isAttachmentThumbnailPathForMemo(input.thumbnailPathname, id)
+    ) {
+      return apiError("缩略图存储路径无效", 400);
+    }
+    if (input.thumbnailPathname) {
+      const thumbnail = await inspectAttachmentFile(input.thumbnailPathname);
+      if (
+        thumbnail.pathname !== input.thumbnailPathname ||
+        thumbnail.contentType !== "image/webp" ||
+        thumbnail.size > 2 * 1024 * 1024
+      ) {
+        return apiError("缩略图信息不一致", 400);
+      }
+    }
 
-  if (!attachment) {
-    await removeAttachmentFile(storageKey);
-    return apiError("没有找到这条记录", 404);
+    const attachment = await createMemoAttachment({
+      memoId: id,
+      filename: input.filename,
+      contentType: input.contentType,
+      byteSize: input.byteSize,
+      storageKey: input.pathname,
+      thumbnailStorageKey: input.thumbnailPathname ?? null,
+    });
+    if (!attachment) return apiError("没有找到这条记录", 404);
+    return NextResponse.json({ attachment }, { status: 201 });
+  } catch {
+    return apiError("图片尚未上传完成，请重试", 409);
   }
-  return NextResponse.json({ attachment }, { status: 201 });
 }

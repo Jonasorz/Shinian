@@ -4,15 +4,29 @@ import {
   authorizeApiRequest,
   authorizeMutationOrigin,
 } from "@/lib/api";
-import { createMemo, listMemos } from "@/lib/db";
+import { createMemo, listMemoPage } from "@/lib/db";
+import {
+  decodeMemoCursor,
+  normalizeMemoPageSize,
+} from "@/lib/memo-pagination";
 import { createMemoSchema } from "@/lib/validation";
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await authorizeApiRequest())) {
     return apiError("请先登录", 401);
   }
 
-  return NextResponse.json({ memos: await listMemos() });
+  const { searchParams } = new URL(request.url);
+  const rawCursor = searchParams.get("cursor");
+  const cursor = decodeMemoCursor(rawCursor);
+  if (rawCursor && !cursor) return apiError("分页位置无效", 400);
+
+  return NextResponse.json(
+    await listMemoPage({
+      cursor,
+      limit: normalizeMemoPageSize(searchParams.get("limit")),
+    }),
+  );
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -35,4 +49,3 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     { status: 201 },
   );
 }
-

@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SidebarTagTree } from "./SidebarTagTree";
-import { MobileNavigation } from "./MobileNavigation";
 import {
   Bell,
   Calendar,
@@ -571,8 +570,6 @@ export function TaskWorkspace({
             <LogOut aria-hidden="true" size={18} />
           </button>
         </header>
-
-        <MobileNavigation active="tasks" />
 
         <div className={styles.contentColumn}>
           <div className={styles.pageHeader}>

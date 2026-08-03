@@ -1,0 +1,54 @@
+.shell {
+  min-height: 100dvh;
+  padding: max(80px, env(safe-area-inset-top)) 24px 110px;
+  background: var(--canvas);
+}
+
+.column {
+  width: min(100%, 720px);
+  margin: 0 auto;
+}
+
+.line,
+.card {
+  border-radius: 14px;
+  background: linear-gradient(
+    100deg,
+    var(--surface-quiet) 20%,
+    var(--surface) 45%,
+    var(--surface-quiet) 70%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+
+.line {
+  width: 42%;
+  height: 28px;
+  margin-bottom: 24px;
+}
+
+.card {
+  height: 136px;
+  margin-bottom: 14px;
+  border: 1px solid var(--divider);
+}
+
+@keyframes shimmer {
+  to {
+    background-position-x: -220%;
+  }
+}
+
+@media (max-width: 820px) {
+  .shell {
+    padding: max(86px, env(safe-area-inset-top)) 16px 110px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line,
+  .card {
+    animation: none;
+  }
+}

@@ -4,7 +4,6 @@ import { ChangeEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SidebarTagTree } from "./SidebarTagTree";
-import { MobileNavigation } from "./MobileNavigation";
 import {
   CheckSquare,
   Download,
@@ -239,8 +238,6 @@ export function SettingsWorkspace({
             <LogOut aria-hidden="true" size={18} />
           </button>
         </header>
-
-        <MobileNavigation active="settings" />
 
         <div className={styles.contentColumn}>
           <div className={styles.pageHeader}>
