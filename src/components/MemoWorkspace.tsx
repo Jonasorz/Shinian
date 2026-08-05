@@ -41,6 +41,7 @@ import {
   canSubmitMemo,
   memoContentForSubmission,
 } from "@/lib/memo-composer";
+import { sortMemos } from "@/lib/memo-state";
 import styles from "@/app/notes/notes.module.css";
 
 const DRAFT_KEY = "shinian.memo.draft";
@@ -105,14 +106,6 @@ function timeLabel(value: string): string {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(value));
-}
-
-function sortMemos(memos: Memo[]): Memo[] {
-  return [...memos].sort(
-    (left, right) =>
-      new Date(right.createdAt).getTime() -
-      new Date(left.createdAt).getTime(),
-  );
 }
 
 function hasTaskIntent(content: string): boolean {

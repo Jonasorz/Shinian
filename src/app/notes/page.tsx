@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { MemoWorkspace } from "@/components/MemoWorkspace";
 import { getContentCounts, listMemoPage } from "@/lib/db";
+import { memoWorkspaceVersion } from "@/lib/memo-state";
 import { currentUser } from "@/lib/session";
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default async function NotesPage() {
 
   return (
     <MemoWorkspace
+      key={memoWorkspaceVersion(memos)}
       initialMemos={memos}
       initialNextCursor={nextCursor}
       totalMemoCount={memoCount}
